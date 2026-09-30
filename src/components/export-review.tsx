@@ -7,7 +7,7 @@ import {
   type NetworkField,
   scanNetworkEvents,
   toCurl,
-} from "@browser-recorder/core";
+} from "@ai-qa-engineer/core";
 import { Check, ChevronDown, ChevronRight, Copy, ShieldAlert } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -283,18 +283,23 @@ export function IncludeOptions({
   rows,
   value,
   onToggle,
+  heading = "Include in export",
+  description,
 }: {
   rows: IncludeRow[];
   value: Record<string, boolean>;
   onToggle: (key: string) => void;
+  heading?: string;
+  description?: string;
 }) {
   const total = rows.reduce((n, r) => n + (!r.toggleable || value[r.key] ? r.bytes : 0), 0);
   return (
     <div className="rounded-lg border border-border bg-card p-4">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium">Include in export</span>
+        <span className="text-sm font-medium">{heading}</span>
         <span className="text-xs text-muted-foreground tabular-nums">≈ {formatBytes(total)}</span>
       </div>
+      {description && <p className="mb-3 text-xs text-muted-foreground">{description}</p>}
       <div className="flex flex-col gap-1">
         {rows.map((r) => (
           <label

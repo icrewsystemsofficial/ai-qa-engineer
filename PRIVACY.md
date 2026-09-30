@@ -1,13 +1,13 @@
-# Privacy Policy — Browser Recorder
+# Privacy Policy — AI QA Engineer
 
 _Last updated: 2026-09-16_
 
-Browser Recorder is a bug-reporting capture tool. This policy explains what the
+AI QA Engineer is a bug-reporting capture tool. This policy explains what the
 extension does and does not do with your data.
 
 ## The short version
 
-**Browser Recorder does not collect, transmit, or share any of your data.**
+**AI QA Engineer does not collect, transmit, or share any of your data.**
 There is no server, no account, and no cloud component. The extension makes no
 network requests of its own. Everything it captures stays on your device until
 you explicitly export it.
@@ -25,7 +25,7 @@ extension records data from the tabs you record:
 - Screenshots you take, and optional tab video
 - Optional dictation only when the browser exposes explicitly local speech
   processing. If local processing is unavailable, dictation stays unavailable;
-  Browser Recorder does not fall back to remote speech recognition.
+  AI QA Engineer does not fall back to remote speech recognition.
 - The list of your installed extensions (noted in the report metadata so a bug
   report records what else was running)
 
@@ -65,4 +65,4 @@ with a new "Last updated" date.
 ## Contact
 
 Questions: open an issue at
-<https://github.com/HabitatHQ/browser-recorder/issues>.
+<https://github.com/icrewsystemsofficial/ai-qa-engineer/issues>.

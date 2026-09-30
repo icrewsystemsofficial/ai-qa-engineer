@@ -17,6 +17,7 @@ import type { ExtensionError } from "@/lib/error-log";
 import { sendToBackground } from "@/lib/messaging";
 import {
   type CaptureConfig,
+  DEFAULT_AI_CONTEXT_PROMPT,
   DEFAULT_CAPTURE_CONFIG,
   DEFAULT_NETWORK_FILTER,
   DEFAULT_RING_CONFIG,
@@ -64,6 +65,7 @@ export default function App() {
   const [captureConfig, setCaptureConfig] = useState<CaptureConfig>(DEFAULT_CAPTURE_CONFIG);
   const [networkFilter, setNetworkFilter] = useState<NetworkFilterConfig>(DEFAULT_NETWORK_FILTER);
   const [videoConfig, setVideoConfig] = useState<VideoConfig>(DEFAULT_VIDEO_CONFIG);
+  const [aiContextPrompt, setAiContextPrompt] = useState(DEFAULT_AI_CONTEXT_PROMPT);
   const [ringConfig, setRingConfig] = useState<RingConfig>(DEFAULT_RING_CONFIG);
   const [exclusionText, setExclusionText] = useState("");
   const [customHeadersText, setCustomHeadersText] = useState("");
@@ -99,11 +101,13 @@ export default function App() {
       captureConfig: CaptureConfig;
       networkFilter: NetworkFilterConfig;
       videoConfig: VideoConfig;
+      aiContextPrompt: string;
     }>({ type: "get-settings" })
-      .then(({ captureConfig: cc, networkFilter: nf, videoConfig: vc }) => {
+      .then(({ captureConfig: cc, networkFilter: nf, videoConfig: vc, aiContextPrompt: prompt }) => {
         setCaptureConfig(cc);
         setNetworkFilter(nf);
         setVideoConfig(vc);
+        setAiContextPrompt(prompt);
         setExclusionText(nf.exclusionPatterns.join("\n"));
         setCustomHeadersText(nf.customRedactedHeaders.join("\n"));
       })
@@ -232,6 +236,7 @@ export default function App() {
         captureConfig,
         networkFilter: finalFilter,
         videoConfig,
+        aiContextPrompt,
       });
       const parseLines = (text: string) =>
         text
@@ -266,7 +271,7 @@ export default function App() {
       <div className="mx-auto max-w-2xl px-6 py-8">
         <h1 className="flex items-center gap-2.5 text-xl font-semibold mb-6">
           <Logo className="h-7 w-7" />
-          Browser Recorder — Settings
+          AI QA Engineer — Settings
         </h1>
 
         <section className="mb-6">
@@ -276,6 +281,31 @@ export default function App() {
           <Separator className="mb-4" />
 
           <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-1.5">
+                  <Label className="font-medium">Capture source</Label>
+                  <InfoTooltip text="Current tab starts immediately. The other choices open Chrome's protected share picker, where you choose the exact screen, desktop, window, or tab to record." />
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">Choose what the recording video should show</p>
+              </div>
+              <select
+                className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={videoConfig.source}
+                onChange={(e) => {
+                  setVideoConfig((v) => ({
+                    ...v,
+                    source: e.target.value as VideoConfig["source"],
+                  }));
+                  setIsDirty(true);
+                }}
+              >
+                <option value="tab">Current browser tab</option>
+                <option value="picker">Choose a screen, window, or tab</option>
+                <option value="desktop">Entire desktop</option>
+              </select>
+            </div>
+
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-1.5">
@@ -518,7 +548,7 @@ export default function App() {
                   <Label htmlFor="opt-zip-nesting" className="font-medium">
                     Nest files in folder
                   </Label>
-                  <InfoTooltip text="Places all files inside a named folder within the zip (e.g. browser-recording-example-com-20240101-1200/report.md). Prevents files from scattering into the current directory on extraction. On by default." />
+                  <InfoTooltip text="Places all files inside a named folder within the zip (e.g. ai-qa-engineer-example-com-20240101-1200/report.md). Prevents files from scattering into the current directory on extraction. On by default." />
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Wrap zip contents in a folder to avoid clobbering on extraction
@@ -537,10 +567,10 @@ export default function App() {
                   <Label htmlFor="opt-title-filename" className="font-medium">
                     Use title as filename
                   </Label>
-                  <InfoTooltip text="Names the exported zip after the report title slug (e.g. login-flow-broken.zip) instead of the default browser-recording-<host>-<timestamp>.zip. Off by default." />
+                  <InfoTooltip text="Names the exported zip after the report title slug (e.g. login-flow-broken.zip) instead of the default ai-qa-engineer-<host>-<timestamp>.zip. Off by default." />
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Off: browser-recording-&lt;host&gt;-&lt;timestamp&gt;.zip
+                  Off: ai-qa-engineer-&lt;host&gt;-&lt;timestamp&gt;.zip
                 </p>
               </div>
               <Switch
@@ -660,6 +690,65 @@ export default function App() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="opt-video-microphone" className="font-medium">Microphone narration</Label>
+                  <InfoTooltip text="Mixes your microphone into recorded video. Starting a video session asks Chrome for microphone access before recording begins." />
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">Include spoken QA narration with the tab audio</p>
+              </div>
+              <Switch
+                id="opt-video-microphone"
+                checked={videoConfig.microphone}
+                onChange={() => {
+                  setVideoConfig((v) => ({ ...v, microphone: !v.microphone }));
+                  setIsDirty(true);
+                }}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="mb-6">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+            AI context handoff
+          </h2>
+          <Separator className="mb-4" />
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="opt-ai-context-prompt" className="font-medium">
+                Copy context prompt
+              </Label>
+              <InfoTooltip text="This instruction is placed before the evidence copied from a report. Include {{CONTEXT}} exactly where the selected session evidence should appear. If omitted, it is appended automatically." />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Used whenever you select “Copy context for AI” in a recording report.
+            </p>
+            <Textarea
+              id="opt-ai-context-prompt"
+              className="min-h-52 font-mono text-xs leading-relaxed"
+              value={aiContextPrompt}
+              onChange={(e) => {
+                setAiContextPrompt(e.target.value);
+                setIsDirty(true);
+              }}
+              placeholder="Write the instructions for your AI assistant, then include {{CONTEXT}}."
+            />
+            <div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setAiContextPrompt(DEFAULT_AI_CONTEXT_PROMPT);
+                  setIsDirty(true);
+                }}
+              >
+                Restore default prompt
+              </Button>
             </div>
           </div>
         </section>

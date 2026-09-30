@@ -7,17 +7,17 @@ import type {
   DebuggerSSEEvent,
   DebuggerWebSocketEvent,
   ReportInput,
-} from "@browser-recorder/core";
-import { buildReportMd, buildTimeline, summarizePerformance } from "@browser-recorder/core";
+} from "@ai-qa-engineer/core";
+import { buildReportMd, buildTimeline, summarizePerformance } from "@ai-qa-engineer/core";
 import { Zip, ZipPassThrough } from "fflate";
 import { buildReplayHtml } from "./replay-html";
 import { loadReplayRuntimeSource } from "./replay-runtime";
 import { buildReportHtml } from "./report-html";
 
 function buildReadme(repoUrl: string | undefined): string {
-  const tool = repoUrl ? `[Browser Recorder](${repoUrl})` : "Browser Recorder";
+  const tool = repoUrl ? `[AI QA Engineer](${repoUrl})` : "AI QA Engineer";
   return `\
-# Bug report — Browser Recorder
+# Bug report — AI QA Engineer
 
 Captured with ${tool}.
 
@@ -38,7 +38,7 @@ Captured with ${tool}.
 | video.webm | Tab recording (if enabled) |
 | replay.html | Self-contained DOM session replay (experimental). Open in any browser — scrub, play, and pause a reconstruction of the page. No extension or network needed. |
 | replay.json | Raw rrweb events behind replay.html, for tooling. |
-| _browser_recorder_self_diagnostics.json | Self-diagnostics from the recorder itself: per-feature capture health (what was enabled, what produced data, any non-fatal errors). Use it to tell "the app had no console errors" apart from "console capture silently failed". |
+| _ai_qa_engineer_self_diagnostics.json | Self-diagnostics from the recorder itself: per-feature capture health (what was enabled, what produced data, any non-fatal errors). Use it to tell "the app had no console errors" apart from "console capture silently failed". |
 
 ## Notes
 
@@ -88,7 +88,7 @@ export interface ExportInput {
   };
   /** rrweb session-replay events (experimental); omitted/empty → no replay files. */
   replayEvents?: unknown[];
-  /** Capture-health diagnostics; written as _browser_recorder_self_diagnostics.json. */
+  /** Capture-health diagnostics; written as _ai_qa_engineer_self_diagnostics.json. */
   diagnostics?: unknown;
   nestInFolder?: boolean;
   zipTitleFilename?: boolean;
@@ -125,8 +125,8 @@ export function computeExportBaseName(
   if (zipTitleFilename) {
     const s = slugify(formValues.title);
     return s
-      ? `browser-recording-${s}-${toFilenameTimestamp(now)}`
-      : `browser-recording-${toFilenameTimestamp(now)}`;
+      ? `ai-qa-engineer-${s}-${toFilenameTimestamp(now)}`
+      : `ai-qa-engineer-${toFilenameTimestamp(now)}`;
   }
   const rawSlug =
     formValues.title && formValues.title !== "Bug report"
@@ -141,7 +141,7 @@ export function computeExportBaseName(
           })()
         : "";
   const slug = slugify(rawSlug);
-  return `browser-recording${slug ? `-${slug}` : ""}-${toFilenameTimestamp(now)}`;
+  return `ai-qa-engineer${slug ? `-${slug}` : ""}-${toFilenameTimestamp(now)}`;
 }
 
 function encode(text: string): Uint8Array {
@@ -414,7 +414,7 @@ export async function exportReportAsZip(input: ExportInput): Promise<string> {
     if (diagnostics) {
       addText(
         zip,
-        `${prefix}_browser_recorder_self_diagnostics.json`,
+        `${prefix}_ai_qa_engineer_self_diagnostics.json`,
         JSON.stringify(diagnostics, null, 2)
       );
     }

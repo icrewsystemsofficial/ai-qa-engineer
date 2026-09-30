@@ -1,4 +1,4 @@
-import type { DebuggerPerformanceEvent } from "@browser-recorder/core";
+import type { DebuggerPerformanceEvent } from "@ai-qa-engineer/core";
 import { type Metric, onCLS, onFCP, onINP, onLCP, onTTFB } from "web-vitals";
 import type { Reporter } from "./types";
 

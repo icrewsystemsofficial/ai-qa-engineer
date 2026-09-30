@@ -1,15 +1,15 @@
 {
-  "name": "browser-recorder",
+  "name": "ai-qa-engineer",
   "version": "0.7.1",
   "private": true,
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/HabitatHQ/browser-recorder.git"
+    "url": "git+https://github.com/icrewsystemsofficial/ai-qa-engineer.git"
   },
-  "homepage": "https://github.com/HabitatHQ/browser-recorder",
+  "homepage": "https://github.com/icrewsystemsofficial/ai-qa-engineer",
   "bugs": {
-    "url": "https://github.com/HabitatHQ/browser-recorder/issues"
+    "url": "https://github.com/icrewsystemsofficial/ai-qa-engineer/issues"
   },
   "scripts": {
     "dev": "wxt --port 5555",
@@ -31,7 +31,7 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
-    "@browser-recorder/core": "workspace:*",
+    "@ai-qa-engineer/core": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "fflate": "^0.8.2",

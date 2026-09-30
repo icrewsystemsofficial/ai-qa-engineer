@@ -1,4 +1,4 @@
-import { buildTimeline, toCurl } from "@browser-recorder/core";
+import { buildTimeline, toCurl } from "@ai-qa-engineer/core";
 import { describe, expect, it } from "vitest";
 import { buildReportHtml } from "./report-html";
 

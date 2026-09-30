@@ -1,0 +1,749 @@
+.recorder-shell {
+  --color-background: #07111f;
+  --color-foreground: #e6edf7;
+  --color-card: #0d1b2d;
+  --color-card-foreground: #e6edf7;
+  --color-border: #1d314b;
+  --color-input: #2a405e;
+  --color-muted: #101f33;
+  --color-muted-foreground: #94a8c2;
+  --color-primary: #4f8cff;
+  --color-primary-foreground: #fff;
+  --color-secondary: #142b49;
+  --color-secondary-foreground: #c8dcff;
+  --color-accent: #142b49;
+  --color-accent-foreground: #c8dcff;
+  --color-ring: #4f8cff;
+  min-height: 100vh;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: dark;
+}
+.recorder-shell button,
+.recorder-shell a,
+.recorder-shell summary {
+  -webkit-tap-highlight-color: transparent;
+}
+.recorder-shell button:not(:disabled),
+.recorder-shell summary {
+  cursor: pointer;
+}
+.recorder-shell :is(button, a, input, summary, textarea, [tabindex]):focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 4px;
+}
+.recorder-masthead {
+  height: 82px;
+  padding: 0 4%;
+  border-bottom: 1px solid var(--color-border);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.recorder-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -.5px;
+}
+.recorder-logo {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+}
+.recorder-brand-caption {
+  display: block;
+  margin-top: 2px;
+  font-size: 9px;
+  letter-spacing: 1.9px;
+  font-weight: 550;
+  color: #78817b;
+}
+.recorder-workspace-link {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+  color: #59665d;
+  padding: 10px 0;
+}
+.recorder-workspace-link:hover {
+  color: #275e48;
+}
+.recorder-main {
+  max-width: 1600px;
+  margin: auto;
+  padding: 34px 4% 20px;
+}
+.recorder-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 30px;
+}
+.recorder-title-block {
+  min-width: 0;
+}
+.recorder-eyebrow {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.65px;
+  font-weight: 650;
+  color: #657568;
+}
+.recorder-title-block h1 {
+  font-size: clamp(24px, 2.4vw, 34px);
+  line-height: 1.25;
+  letter-spacing: -1.1px;
+  font-weight: 580;
+  margin: 8px 0 10px;
+  overflow-wrap: anywhere;
+}
+.recorder-session-meta {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 20px;
+  row-gap: 5px;
+  color: #727b74;
+  font-size: 11px;
+}
+.recorder-source {
+  max-width: 650px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recorder-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  color: #426650;
+  font-size: 11px;
+}
+.recorder-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 350px;
+  gap: 28px;
+  align-items: start;
+}
+.recorder-evidence,
+.recorder-sidebar {
+  min-width: 0;
+}
+.recorder-section-heading {
+  min-height: 55px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.recorder-section-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.recorder-section-heading h2 > svg {
+  color: #707c73;
+}
+.recorder-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #526758;
+  font-size: 11px;
+}
+.recorder-text-button:hover {
+  color: #1d4a33;
+  text-decoration: underline;
+}
+.recorder-text-button:disabled {
+  opacity: 0.5;
+}
+.recorder-playback {
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: white;
+  overflow: hidden;
+}
+.recorder-playback > .recorder-section-heading {
+  padding: 0 20px;
+}
+.recorder-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  max-height: 65vh;
+  background: #171c19;
+  object-fit: contain;
+}
+.recorder-video-empty {
+  aspect-ratio: 16 / 10;
+  background: #1e2722;
+  color: #b9c4bb;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  text-align: center;
+}
+.recorder-video-empty h3 {
+  font-size: 15px;
+  color: #e3e9e1;
+  margin: 20px 0 7px;
+  font-weight: 500;
+}
+.recorder-video-empty p {
+  font-size: 12px;
+  max-width: 290px;
+  line-height: 1.7;
+}
+.recorder-playback-caption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 13px 20px;
+  color: #748076;
+  font-size: 10px;
+}
+.recorder-playback-caption > span:first-child {
+  color: #48574c;
+}
+.recorder-screenshots {
+  margin-top: 18px;
+  margin-bottom: 24px;
+}
+.recorder-count {
+  font-size: 10px;
+  font-weight: 500;
+  color: #68796b;
+  background: #e9ede6;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.recorder-helper {
+  font-size: 10px;
+  color: #7b847d;
+}
+.recorder-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.recorder-shot {
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+.recorder-shot-preview {
+  display: block;
+  width: 100%;
+  background: #e9ece6;
+  overflow: hidden;
+}
+.recorder-shot-preview img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: contain;
+  transition: transform .2s;
+}
+.recorder-shot-preview:hover img {
+  transform: scale(1.025);
+}
+.recorder-shot figcaption {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 11px;
+  font-size: 10px;
+  color: #768177;
+}
+.recorder-shot figcaption b {
+  font-weight: 500;
+  font-family: monospace;
+  margin-right: 4px;
+  color: #364a3c;
+}
+.recorder-shot figcaption > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #365a41;
+}
+.recorder-shot figcaption button:hover {
+  text-decoration: underline;
+}
+.recorder-remove {
+  color: #879188;
+}
+.recorder-remove:hover {
+  color: #b22e2e;
+}
+.recorder-empty {
+  border: 1px dashed #d8ded4;
+  padding: 30px 20px;
+  color: #778479;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 12px;
+  text-align: center;
+}
+.recorder-details {
+  border-top: 1px solid var(--color-border);
+}
+.recorder-details > summary {
+  padding: 18px 0;
+  font-size: 12px;
+  font-weight: 550;
+}
+.recorder-details > summary span {
+  float: right;
+  font-size: 10px;
+  font-weight: 400;
+  color: #79857b;
+}
+.recorder-details-body {
+  padding: 0 0 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.recorder-timeline {
+  border: 1px solid var(--color-border);
+  background: #fff;
+  border-radius: 9px;
+  overflow: hidden;
+}
+.recorder-timeline > .recorder-section-heading {
+  padding: 0 18px;
+  border-bottom: 1px solid #e9ece6;
+}
+.recorder-events {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 370px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #c5cec2 transparent;
+}
+.recorder-events li { border-bottom: 1px solid #eff1ec; }
+.recorder-events li:last-child {
+  border-bottom: 0;
+}
+.recorder-event-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  padding: 7px 18px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.25;
+}
+.recorder-event-row:hover { background: #f4f7f2; }
+.recorder-event-time {
+  width: 36px;
+  flex: 0 0 36px;
+  color: #728075;
+  font-variant-numeric: tabular-nums;
+}
+.recorder-event-type {
+  flex: 0 0 72px;
+  text-transform: capitalize;
+  color: #397456;
+  font-weight: 650;
+}
+.recorder-event-label {
+  min-width: 0;
+  flex: 1;
+  color: #303b34;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recorder-event-screenshot { position: relative; display: inline-flex; color: #397456; }
+.recorder-event-screenshot > svg { cursor: help; }
+.recorder-event-screenshot-popover {
+  pointer-events: none;
+  position: absolute;
+  z-index: 20;
+  right: 0;
+  top: calc(100% + 8px);
+  display: none;
+  width: 320px;
+  padding: 6px;
+  border: 1px solid #cfd8cc;
+  border-radius: 7px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(34, 52, 40, .18);
+}
+.recorder-event-screenshot:hover .recorder-event-screenshot-popover,
+.recorder-event-screenshot:focus-within .recorder-event-screenshot-popover { display: block; }
+.recorder-event-screenshot-popover img { display: block; width: 100%; max-height: 220px; object-fit: contain; background: #edf1ec; }
+.recorder-handoff {
+  margin-top: 20px;
+  padding: 23px;
+  background: #edf1e9;
+  border: 1px solid #dce3d6;
+  border-radius: 9px;
+}
+.recorder-handoff-heading h2 {
+  margin: 8px 0;
+  font-size: 20px;
+  font-weight: 550;
+  line-height: 1.3;
+  letter-spacing: -.65px;
+}
+.recorder-handoff-heading > p {
+  color: #73806e;
+  font-size: 11px;
+}
+.recorder-copy-options {
+  border: 0;
+  padding: 15px 0 16px;
+  margin: 0;
+}
+.recorder-copy-options label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 0;
+  font-size: 12px;
+  cursor: pointer;
+}
+.recorder-copy-options input {
+  width: 14px;
+  height: 14px;
+  accent-color: #275e48;
+}
+.recorder-copy-options label > span {
+  flex: 1;
+}
+.recorder-copy-options small {
+  font: 10px monospace;
+  color: #7e8c78;
+}
+.recorder-copy-button {
+  width: 100%;
+  min-height: 42px;
+  font-size: 12px;
+  border-radius: 5px;
+  box-shadow: none;
+  background: #285c44;
+  color: #fff;
+}
+.recorder-copy-button:hover {
+  background: #1e4834;
+}
+.recorder-copy-note {
+  text-align: center;
+  margin-top: 10px;
+  font-size: 10px;
+  color: #74836f;
+}
+.recorder-save-section {
+  margin-top: 22px;
+  border-top: 1px solid #d7e0d0;
+  padding-top: 20px;
+}
+.recorder-save-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.recorder-save-heading > svg {
+  margin-top: 2px;
+  color: #6c8066;
+  flex-shrink: 0;
+}
+.recorder-save-heading h3 {
+  font-size: 12px;
+  font-weight: 600;
+}
+.recorder-save-heading p {
+  margin: 5px 0 0;
+  font-size: 10px;
+  line-height: 1.7;
+  color: #74836f;
+}
+.recorder-save-heading a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.recorder-package {
+  margin: 12px 0;
+}
+.recorder-package summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 0;
+  font-size: 11px;
+  color: #52684c;
+  list-style: none;
+}
+.recorder-package summary::-webkit-details-marker {
+  display: none;
+}
+.recorder-package[open] summary svg {
+  transform: rotate(180deg);
+}
+.recorder-package > div {
+  margin-bottom: 15px;
+  padding: 12px;
+}
+.recorder-download-button {
+  width: 100%;
+  min-height: 39px;
+  font-size: 12px;
+  border-radius: 5px;
+  background: transparent;
+  border-color: #bccbb6;
+  color: #3d5e35;
+  box-shadow: none;
+}
+.recorder-download-button:hover {
+  background: #e0e8da;
+}
+.recorder-error {
+  display: flex;
+  gap: 7px;
+  color: #ac2828;
+  font-size: 12px;
+  margin-top: 12px;
+}
+.recorder-footer {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--color-border);
+  padding-top: 20px;
+  margin-top: 36px;
+  font-size: 10px;
+  color: #8b9389;
+}
+@media (min-width: 1450px) {
+  .recorder-layout {
+    grid-template-columns: minmax(0, 1fr) 390px;
+    gap: 36px;
+  }
+  .recorder-events {
+    max-height: 440px;
+  }
+}
+@media (max-width: 1050px) {
+  .recorder-layout {
+    grid-template-columns: minmax(0, 1fr) 310px;
+    gap: 20px;
+  }
+  .recorder-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .recorder-handoff {
+    padding: 18px;
+  }
+}
+@media (max-width: 780px) {
+  .recorder-masthead {
+    height: 70px;
+  }
+  .recorder-main {
+    padding-top: 25px;
+  }
+  .recorder-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .recorder-title-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+  .recorder-title-block h1 {
+    font-size: 25px;
+  }
+  .recorder-source {
+    max-width: 85vw;
+  }
+  .recorder-events {
+    max-height: 320px;
+  }
+  .recorder-handoff {
+    padding: 24px;
+  }
+  .recorder-details > summary span {
+    display: none;
+  }
+}
+@media (max-width: 430px) {
+  .recorder-brand {
+    font-size: 13px;
+    gap: 7px;
+  }
+  .recorder-logo {
+    width: 30px;
+    height: 30px;
+  }
+  .recorder-brand-caption {
+    font-size: 8px;
+    letter-spacing: 1px;
+  }
+  .recorder-workspace-link {
+    font-size: 10px;
+    gap: 5px;
+  }
+  .recorder-helper {
+    font-size: 9px;
+  }
+  .recorder-gallery {
+    gap: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .recorder-shell * {
+    transition: none !important;
+  }
+}
+
+/* Recorder brand palette and navigation surface. Kept here so the report can
+   retain its existing structure while never inheriting the previous green skin. */
+.recorder-masthead { background: #ffffff; }
+.recorder-brand-caption, .recorder-session-meta, .recorder-helper,
+.recorder-eyebrow, .recorder-playback-caption { color: #64748b; }
+.recorder-workspace-link, .recorder-text-button { color: #475569; }
+.recorder-workspace-link:hover, .recorder-text-button:hover { color: #2563eb; }
+.recorder-saved { color: #2563eb; }
+.recorder-video { background: #020617; }
+.recorder-video-empty { background: #020617; color: #94a3b8; }
+.recorder-video-empty h3 { color: #e2e8f0; }
+.recorder-timeline { border-color: #dbe5f3; border-radius: 12px; box-shadow: 0 10px 25px rgba(15, 23, 42, .05); }
+.recorder-timeline > .recorder-section-heading { border-color: #e2e8f0; }
+.recorder-navigation-tools { padding: 0 14px 12px; border-bottom: 1px solid #e2e8f0; }
+.recorder-navigation-search { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 7px; color: #64748b; background: #fff; }
+.recorder-navigation-search:focus-within { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, .12); }
+.recorder-navigation-search input { min-width: 0; flex: 1; border: 0; outline: 0; color: #0f172a; font-size: 12px; background: transparent; }
+.recorder-navigation-filters { display: flex; gap: 6px; padding-top: 9px; }
+.recorder-navigation-filters button { border: 1px solid #dbe5f3; border-radius: 999px; padding: 4px 9px; background: #fff; color: #64748b; font-size: 10px; font-weight: 600; }
+.recorder-navigation-filters button:hover { border-color: #93c5fd; color: #1d4ed8; }
+.recorder-navigation-filters button.is-active { border-color: #2563eb; background: #eff6ff; color: #1d4ed8; }
+.recorder-events { max-height: 430px; scrollbar-color: #cbd5e1 transparent; }
+.recorder-events li { border-color: #eef2f7; }
+.recorder-event-row { padding: 0; min-height: 0; }
+.recorder-event-row > button { display: flex; width: 100%; min-height: 44px; align-items: center; gap: 9px; padding: 8px 14px 8px 18px; text-align: left; border: 0; background: #fff; }
+.recorder-event-row > button:hover { background: #f8fbff; }
+.recorder-event-row > button.is-active { background: #eff6ff; box-shadow: inset 3px 0 0 #2563eb; }
+.recorder-event-time { color: #64748b; }
+.recorder-event-type { color: #2563eb; }
+.recorder-event-label { color: #334155; }
+.recorder-event-screenshot { color: #2563eb; }
+.recorder-event-screenshot-popover { border-color: #bfdbfe; box-shadow: 0 14px 34px rgba(15, 23, 42, .16); }
+.recorder-event-screenshot-popover img { background: #f1f5f9; }
+.recorder-handoff { background: #f8fbff; border-color: #dbeafe; }
+.recorder-handoff-heading > p, .recorder-copy-note, .recorder-save-heading p { color: #64748b; }
+.recorder-copy-options input { accent-color: #2563eb; }
+.recorder-copy-button { background: #2563eb; }
+.recorder-copy-button:hover { background: #1d4ed8; }
+.recorder-save-section { border-color: #dbeafe; }
+.recorder-save-heading > svg, .recorder-package summary { color: #2563eb; }
+.recorder-download-button { border-color: #93c5fd; color: #1d4ed8; }
+.recorder-download-button:hover { background: #eff6ff; }
+
+/* Dark-only report theme. These end-of-file rules intentionally supersede the
+   earlier light exploration while retaining the report's established layout. */
+.recorder-shell { background: #07111f; color: #e6edf7; }
+.recorder-masthead, .recorder-playback, .recorder-timeline { background: #0d1b2d; border-color: #1d314b; }
+.recorder-brand, .recorder-title-block h1, .recorder-section-heading h2 { color: #f5f8ff; }
+.recorder-brand-caption, .recorder-session-meta, .recorder-helper, .recorder-eyebrow, .recorder-playback-caption, .recorder-workspace-link, .recorder-text-button { color: #94a8c2; }
+.recorder-workspace-link:hover, .recorder-text-button:hover { color: #80aeff; }
+.recorder-saved { color: #77a7ff; }
+.recorder-playback { max-width: 900px; margin: 0 auto; }
+.recorder-video { aspect-ratio: 16 / 9; max-height: 420px; background: #020814; }
+.recorder-video-empty { aspect-ratio: 16 / 9; background: #020814; color: #8ca2be; }
+.recorder-video-empty h3 { color: #e6edf7; }
+.recorder-playback-caption > span:first-child { color: #c5d5eb; }
+.recorder-layout { grid-template-columns: minmax(0, 1fr) 470px; gap: 34px; }
+.recorder-sidebar { display: flex; flex-direction: column; gap: 14px; }
+.recorder-change-context, .recorder-reproduction-notes { border: 1px solid #1d314b; border-radius: 12px; background: #0d1b2d; padding: 15px 16px; }
+.recorder-change-context-heading, .recorder-reproduction-notes-heading { display: flex; align-items: center; gap: 8px; color: #b9d2ff; }
+.recorder-change-context h2, .recorder-reproduction-notes h2 { margin: 0; font-size: 12px; font-weight: 650; color: #e6edf7; }
+.recorder-change-context label { display: block; margin-top: 12px; }
+.recorder-change-context label > span { display: block; margin-bottom: 6px; color: #8fa6c3; font-size: 10px; font-weight: 650; text-transform: uppercase; letter-spacing: .08em; }
+.recorder-change-context input { width: 100%; height: 34px; border: 1px solid #2a405e; border-radius: 6px; padding: 0 10px; background: #091526; color: #e6edf7; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; outline: none; }
+.recorder-change-context input:focus { border-color: #4f8cff; box-shadow: 0 0 0 3px rgba(79, 140, 255, .14); }
+.recorder-version { display: flex; align-items: center; gap: 6px; margin-top: 10px; color: #8fa6c3; font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.recorder-build-values { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.recorder-build-values span { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #2a405e; border-radius: 999px; padding: 3px 7px; color: #b8cce7; font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.recorder-build-unavailable { margin: 10px 0 0; color: #d7b76d; font-size: 10px; line-height: 1.5; }
+.recorder-build-unavailable code { color: #f2d68e; }
+.recorder-reproduction-notes { border-color: #274363; background: linear-gradient(135deg, #0d1b2d, #102642); }
+.recorder-reproduction-notes p { max-height: 150px; margin: 11px 0 0; overflow: auto; white-space: pre-wrap; color: #d4e0f1; font-size: 12px; line-height: 1.6; }
+.recorder-reproduction-notes .recorder-notes-empty { color: #7e94b1; font-style: italic; }
+.recorder-timeline { border-radius: 12px; box-shadow: 0 16px 38px rgba(0, 0, 0, .22); }
+.recorder-timeline > .recorder-section-heading, .recorder-navigation-tools { border-color: #1d314b; }
+.recorder-navigation-search { border-color: #2a405e; background: #091526; color: #8fa6c3; }
+.recorder-navigation-search input { color: #e6edf7; }
+.recorder-navigation-filters button { border-color: #2a405e; background: #101f33; color: #9bb2cf; }
+.recorder-navigation-filters button:hover, .recorder-navigation-filters button.is-active { border-color: #4f8cff; background: #17365f; color: #d6e5ff; }
+.recorder-events { max-height: 590px; scrollbar-color: #385273 transparent; }
+.recorder-events li { border-color: #172a43; }
+.recorder-event-row > button { background: #0d1b2d; }
+.recorder-event-row > button:hover { background: #112540; }
+.recorder-event-row > button.is-active { background: #17365f; box-shadow: inset 3px 0 0 #69a0ff; }
+.recorder-event-time { color: #8fa6c3; }
+.recorder-event-type { color: #8db8ff; }
+.recorder-event-label { color: #d8e4f5; }
+.recorder-event-row[data-action="click"] .recorder-event-type { color: #f9c75f; }
+.recorder-event-row[data-action="navigation"] .recorder-event-type { color: #bd9cff; }
+.recorder-event-row[data-action="change"] .recorder-event-type { color: #63d8bb; }
+.recorder-event-screenshot { color: #8db8ff; }
+.recorder-event-screenshot-popover { border-color: #385273; background: #0d1b2d; box-shadow: 0 16px 40px rgba(0, 0, 0, .45); }
+.recorder-event-screenshot-popover img { background: #091526; }
+.recorder-handoff { margin-top: 0; background: #0d1b2d; border-color: #274363; }
+.recorder-handoff-heading h2, .recorder-save-heading h3 { color: #e6edf7; }
+.recorder-handoff-heading > p, .recorder-copy-note, .recorder-save-heading p { color: #8fa6c3; }
+.recorder-copy-options input { accent-color: #4f8cff; }
+.recorder-copy-button { background: #3b78e7; }
+.recorder-copy-button:hover { background: #4f8cff; }
+.recorder-save-section { border-color: #274363; }
+.recorder-save-heading > svg, .recorder-package summary { color: #8db8ff; }
+.recorder-download-button { border-color: #385273; color: #a8c8ff; background: transparent; }
+.recorder-download-button:hover { background: #17365f; }
+.recorder-details { border-color: #1d314b; }
+.recorder-details > summary span, .recorder-details > summary { color: #9fb4ce; }
+.recorder-empty { border-color: #2a405e; color: #94a8c2; }
+
+@media (max-width: 1180px) {
+  .recorder-layout { grid-template-columns: minmax(0, 1fr) 400px; }
+}
+
+/* Long-session navigation: recordings routinely contain hundreds of events.
+   The rail is a bounded, independent scroll surface rather than a short list. */
+.recorder-timeline { min-height: 640px; display: flex; flex-direction: column; }
+.recorder-events { flex: 1 1 auto; height: min(68vh, 980px); max-height: none; overscroll-behavior: contain; }
+.recorder-event-row > button { min-height: 46px; }
+@media (min-width: 1181px) {
+  .recorder-sidebar { position: sticky; top: 18px; align-self: start; max-height: calc(100vh - 36px); overflow: auto; padding-right: 3px; }
+}
+@media (max-width: 780px) {
+  .recorder-timeline { min-height: 420px; }
+  .recorder-events { height: 56vh; }
+}

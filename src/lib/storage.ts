@@ -1,6 +1,7 @@
 import {
   type CaptureConfig,
   DEFAULT_CAPTURE_CONFIG,
+  DEFAULT_AI_CONTEXT_PROMPT,
   DEFAULT_NETWORK_FILTER,
   DEFAULT_RING_CONFIG,
   DEFAULT_RING_SCOPE,
@@ -58,6 +59,7 @@ const KEYS = {
   captureConfig: "captureConfig",
   networkFilter: "networkFilter",
   videoConfig: "videoConfig",
+  aiContextPrompt: "aiContextPrompt",
   // OPFS filenames for standalone (non-session) screenshots
   screenshotFilenames: "screenshotFilenames",
   // OPFS filenames for standalone (non-session) DOM snapshots
@@ -149,11 +151,13 @@ export async function getSettings(): Promise<{
   captureConfig: CaptureConfig;
   networkFilter: NetworkFilterConfig;
   videoConfig: VideoConfig;
+  aiContextPrompt: string;
 }> {
   const result = await chrome.storage.local.get([
     KEYS.captureConfig,
     KEYS.networkFilter,
     KEYS.videoConfig,
+    KEYS.aiContextPrompt,
   ]);
   return {
     captureConfig: {
@@ -168,18 +172,22 @@ export async function getSettings(): Promise<{
       ...DEFAULT_VIDEO_CONFIG,
       ...(result[KEYS.videoConfig] as VideoConfig | undefined),
     },
+    aiContextPrompt:
+      (result[KEYS.aiContextPrompt] as string | undefined) ?? DEFAULT_AI_CONTEXT_PROMPT,
   };
 }
 
 export async function saveSettings(
   captureConfig: CaptureConfig,
   networkFilter: NetworkFilterConfig,
-  videoConfig: VideoConfig
+  videoConfig: VideoConfig,
+  aiContextPrompt: string = DEFAULT_AI_CONTEXT_PROMPT
 ): Promise<void> {
   await chrome.storage.local.set({
     [KEYS.captureConfig]: captureConfig,
     [KEYS.networkFilter]: networkFilter,
     [KEYS.videoConfig]: videoConfig,
+    [KEYS.aiContextPrompt]: aiContextPrompt,
   });
 }
 

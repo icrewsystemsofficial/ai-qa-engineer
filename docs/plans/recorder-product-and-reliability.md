@@ -1,4 +1,4 @@
-# Browser Recorder: product assessment and reliability plan
+# AI QA Engineer: product assessment and reliability plan
 
 Status: assessment complete; implementation proposed, not implemented by this document.
 
@@ -6,7 +6,7 @@ Assessment date: 2026-09-16. Source baseline: version 0.6.1, commit `2bb8756f282
 
 ## 1. Decision summary
 
-Position Browser Recorder as a **local-first diagnostic bug recorder**, not a general-purpose screen recorder. Its strongest proposition is rich browser evidence in a portable report that a recipient can inspect without an account or extension.
+Position AI QA Engineer as a **local-first diagnostic bug recorder**, not a general-purpose screen recorder. Its strongest proposition is rich browser evidence in a portable report that a recipient can inspect without an account or extension.
 
 Before expanding features or promoting an unconditional privacy promise, fix collection controls, redaction boundaries, lifecycle correctness, and network completeness. Then improve the report narrative, handoff, onboarding, and store presentation.
 
@@ -38,13 +38,13 @@ The assessment did not establish our own public Chrome Web Store listing, instal
 
 ### Search and naming
 
-The initial [Chrome Web Store search for `recorder`](https://chromewebstore.google.com/search/recorder) was dominated by screen/audio products: Screen Recorder, Awesome Screen Recorder & Screenshot, Screenity, and several audio recorders. Browser Recorder was not among those initial results. Search ordering varies and was not treated as a stable rank.
+The initial [Chrome Web Store search for `recorder`](https://chromewebstore.google.com/search/recorder) was dominated by screen/audio products: Screen Recorder, Awesome Screen Recorder & Screenshot, Screenity, and several audio recorders. AI QA Engineer was not among those initial results. Search ordering varies and was not treated as a stable rank.
 
 An [unrelated extension also named Browser Recorder](https://chromewebstore.google.com/detail/browser-recorder/bmkimnpopagbkknhfpjfbgmhimofmmkm) showed 3,000 users and a 4.6 rating. Those figures are **not ours**.
 
 Recommended listing direction:
 
-> **Browser Recorder — Bug Reports & Debug Capture**
+> **AI QA Engineer — Bug Reports & Debug Capture**
 >
 > Record bugs with console, network, screenshots, and replay. Export locally. No account or cloud required for the report workflow.
 

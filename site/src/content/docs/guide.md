@@ -1,6 +1,6 @@
 ---
 title: Guide
-description: Install Browser Recorder, capture a bug report, review and redact it, and export a self-contained zip.
+description: Install AI QA Engineer, capture a bug report, review and redact it, and export a self-contained zip.
 ---
 
 ## Installation
@@ -109,7 +109,7 @@ Add a title and notes, finish your review, then click **Export ZIP**.
 
 ![Review and export](../../assets/screenshots/recorder.png)
 
-A self-contained `.zip` is saved locally — named `browser-recording-{title}-{date}.zip` — containing:
+A self-contained `.zip` is saved locally — named `ai-qa-engineer-{title}-{date}.zip` — containing:
 
 - `report.html` — **start here.** A self-contained viewer (open in any browser, no server): every channel merged into one filterable timeline, an error-first **Problems** panel, and links to screenshots/DOM/session replay.
 - `report.md` — the same summary as Markdown, for humans and agents

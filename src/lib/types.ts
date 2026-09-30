@@ -1,4 +1,5 @@
-import type { ReplayRequestInput } from "@browser-recorder/core";
+import type { ReplayRequestInput } from "@ai-qa-engineer/core";
+import type { ArchivedRecording, RecordingWorkspace } from "./workspaces";
 import { DEFAULT_RING_SCOPE, type RingScopeConfig, type RingScopeReason } from "./ring/scope";
 
 export type { RingScopeConfig, RingScopeMode, RingScopeReason } from "./ring/scope";
@@ -44,12 +45,17 @@ export interface NetworkFilterConfig {
 
 export type VideoResolution = "720p" | "1080p" | "native";
 export type VideoFormat = "auto" | "vp9" | "vp8" | "av1" | "h264";
+export type VideoSource = "tab" | "picker" | "desktop";
 
 export interface VideoConfig {
   resolution: VideoResolution;
   frameRate: number; // fps
   bitrate: number; // kbps
   format: VideoFormat;
+  /** Mix microphone narration into the recorded video when permission is granted. */
+  microphone: boolean;
+  /** The browser surface that supplies the video. */
+  source: VideoSource;
 }
 
 export const DEFAULT_CAPTURE_CONFIG: CaptureConfig = {
@@ -81,11 +87,27 @@ export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
   frameRate: 30,
   bitrate: 1500,
   format: "auto",
+  microphone: true,
+  source: "tab",
 };
+
+export const DEFAULT_AI_CONTEXT_PROMPT = `You are a senior QA engineer reviewing browser-session evidence.
+
+Use the context below to identify the observed workflow, confirmed behaviour, defects, and the highest-value follow-up tests. Be conservative: distinguish captured evidence from assumptions.
+
+{{CONTEXT}}`;
 
 export interface ScreenshotEntry {
   dataUrl: string;
   annotatedBlob: Blob | null;
+}
+
+export interface AppBuildInfo {
+  version: string | null;
+  branch: string | null;
+  commit: string | null;
+  builtAt: string | null;
+  environment: string | null;
 }
 
 export interface Session {
@@ -110,6 +132,8 @@ export interface Session {
   // interactions, websocket, sse). Written incrementally during recording so
   // the events survive a browser crash. Null until the first event batch arrives.
   eventsOpfsFilename: string | null;
+  /** Optional deployment metadata read from #app-build at recording start. */
+  appBuild: AppBuildInfo | null;
 }
 
 export interface SessionCounts {
@@ -199,11 +223,13 @@ export type BgMessage =
   | { type: "snapshot-dom" }
   | { type: "get-counts" }
   | { type: "get-settings" }
+  | { type: "save-capture-config"; captureConfig: CaptureConfig }
   | {
       type: "save-settings";
       captureConfig: CaptureConfig;
       networkFilter: NetworkFilterConfig;
       videoConfig: VideoConfig;
+      aiContextPrompt: string;
     }
   | { type: "get-ring-status" }
   | { type: "toggle-ring"; enabled: boolean }
@@ -216,6 +242,11 @@ export type BgMessage =
   | { type: "save-ring-scope"; scope: RingScopeConfig }
   | { type: "get-error-log" }
   | { type: "clear-error-log" }
+  | { type: "get-recording-workspaces" }
+  | { type: "get-archived-recording"; id: string }
+  | { type: "delete-archived-recordings"; ids: string[] }
   | { type: "replay-request"; tabId: number; input: ReplayRequestInput };
+
+export type { ArchivedRecording, RecordingWorkspace };
 
 export type BgResponse<T = undefined> = { ok: true; data: T } | { ok: false; error: string };

@@ -1,4 +1,4 @@
-import type { ReplayRequestInput, ReplayResult } from "@browser-recorder/core";
+import type { ReplayRequestInput, ReplayResult } from "@ai-qa-engineer/core";
 
 /** Response bodies larger than this are truncated before crossing back to the UI. */
 const MAX_REPLAY_BODY = 100_000;

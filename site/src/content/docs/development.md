@@ -1,6 +1,6 @@
 ---
 title: Development
-description: Build, test, and ship the Browser Recorder extension or CLI from source.
+description: Build, test, and ship the AI QA Engineer extension or CLI from source.
 ---
 
 Everything you need to build, test, and ship the extension or the CLI from source.
@@ -11,9 +11,9 @@ This is a pnpm workspace with two packages:
 
 | Path | Package | Purpose |
 |---|---|---|
-| `src/`, `public/`, `wxt.config.ts` | `browser-recorder` (root) | The browser extension (WXT + React 19) |
-| `cli/` | `@browser-recorder/cli` | Node CLI that captures via Playwright/CDP |
-| `packages/core` | `@browser-recorder/core` | Shared types + report builders used by both |
+| `src/`, `public/`, `wxt.config.ts` | `ai-qa-engineer` (root) | The browser extension (WXT + React 19) |
+| `cli/` | `@ai-qa-engineer/cli` | Node CLI that captures via Playwright/CDP |
+| `packages/core` | `@ai-qa-engineer/core` | Shared types + report builders used by both |
 
 The capture engine in `src/capture-core/` is adapted from
 [crikket](https://github.com/redpangilinan/crikket) by
@@ -59,12 +59,12 @@ To load the built extension:
 
 ## CLI (workspace package)
 
-The CLI lives in `cli/` and is documented on the [CLI page](/browser-recorder/cli/). To work on it:
+The CLI lives in `cli/` and is documented on the [CLI page](/ai-qa-engineer/cli/). To work on it:
 
 ```sh
-pnpm --filter @browser-recorder/cli dev     # run via tsx (no build step)
-pnpm --filter @browser-recorder/cli build   # emit dist/ for the bin entry
-pnpm --filter @browser-recorder/cli check   # typecheck
+pnpm --filter @ai-qa-engineer/cli dev     # run via tsx (no build step)
+pnpm --filter @ai-qa-engineer/cli build   # emit dist/ for the bin entry
+pnpm --filter @ai-qa-engineer/cli check   # typecheck
 ```
 
 ## Generating screenshots

@@ -8,9 +8,9 @@ This is a pnpm workspace with two packages:
 
 | Path | Package | Purpose |
 |---|---|---|
-| `src/`, `public/`, `wxt.config.ts` | `browser-recorder` (root) | The browser extension (WXT + React 19) |
-| `cli/` | `@browser-recorder/cli` | Node CLI that captures via Playwright/CDP |
-| `packages/core` | `@browser-recorder/core` | Shared types + report builders used by both |
+| `src/`, `public/`, `wxt.config.ts` | `ai-qa-engineer` (root) | The browser extension (WXT + React 19) |
+| `cli/` | `@ai-qa-engineer/cli` | Node CLI that captures via Playwright/CDP |
+| `packages/core` | `@ai-qa-engineer/core` | Shared types + report builders used by both |
 
 The capture engine in `src/capture-core/` is adapted from [crikket](https://github.com/redpangilinan/crikket) by [redpangilinan](https://github.com/redpangilinan) (AGPL-3.0, which is why this whole project is AGPL-3.0). It has since been substantially extended, so it lives in the main source tree rather than a `vendor/` directory — the attribution stands because the original code remains its basis.
 
@@ -55,16 +55,16 @@ To load the built extension:
 The CLI lives in `cli/` and is documented in [cli/README.md](cli/README.md). To work on it:
 
 ```sh
-pnpm --filter @browser-recorder/cli dev     # run via tsx (no build step)
-pnpm --filter @browser-recorder/cli build   # emit dist/ for the bin entry
-pnpm --filter @browser-recorder/cli check   # typecheck
+pnpm --filter @ai-qa-engineer/cli dev     # run via tsx (no build step)
+pnpm --filter @ai-qa-engineer/cli build   # emit dist/ for the bin entry
+pnpm --filter @ai-qa-engineer/cli check   # typecheck
 ```
 
 After building, you can run it via `node cli/dist/index.js` or link it globally:
 
 ```sh
 cd cli && pnpm link --global
-browser-recorder --help
+ai-qa-engineer --help
 ```
 
 ## Generating screenshots

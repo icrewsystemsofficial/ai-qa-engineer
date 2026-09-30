@@ -7,7 +7,7 @@ import {
   headersToText,
   parseHeadersText,
   seedReplayInput,
-} from "@browser-recorder/core";
+} from "@ai-qa-engineer/core";
 import { Loader2, Send } from "lucide-react";
 import { useMemo, useState } from "react";
 

@@ -1,4 +1,4 @@
-import type { ReplayRequestInput } from "@browser-recorder/core";
+import type { ReplayRequestInput } from "@ai-qa-engineer/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MAX_REPLAY_BODY, replayInPage } from "./request-replay";
 

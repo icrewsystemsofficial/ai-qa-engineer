@@ -1,16 +1,16 @@
 ---
 title: Privacy Policy
-description: Browser Recorder does not collect, transmit, or share any of your data. Everything stays on your device until you explicitly export it.
+description: AI QA Engineer does not collect, transmit, or share any of your data. Everything stays on your device until you explicitly export it.
 ---
 
 _Last updated: 2026-07-17_
 
-Browser Recorder is a bug-reporting capture tool. This policy explains what the
+AI QA Engineer is a bug-reporting capture tool. This policy explains what the
 extension does and does not do with your data.
 
 ## The short version
 
-**Browser Recorder does not collect, transmit, or share any of your data.**
+**AI QA Engineer does not collect, transmit, or share any of your data.**
 There is no server, no account, and no cloud component. The extension makes no
 network requests of its own. Everything it captures stays on your device until
 you explicitly export it.
@@ -62,4 +62,4 @@ with a new "Last updated" date.
 ## Contact
 
 Questions: open an issue at
-<https://github.com/HabitatHQ/browser-recorder/issues>.
+<https://github.com/icrewsystemsofficial/ai-qa-engineer/issues>.

@@ -1,19 +1,13 @@
-import type {
-  DebuggerActionEvent,
-  DebuggerConsoleEvent,
-  DebuggerNetworkEvent,
-  DebuggerSSEEvent,
-  DebuggerWebSocketEvent,
-} from "@/capture-core/debugger/types";
+import type { DebuggerActionEvent, DebuggerConsoleEvent } from "@/capture-core/debugger/types";
 import { AnnotationCanvas } from "@/components/annotation/AnnotationCanvas";
 import { DiagnosticsPanel } from "@/components/diagnostics-panel";
 import { IncludeOptions, type IncludeRow, NetworkPrivacyReview } from "@/components/export-review";
+import { Logo } from "@/components/logo";
 import { ReplayPlayer } from "@/components/replay-player";
-import { Badge } from "@/components/ui/badge";
+import "./recorder.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { MicButton } from "@/components/voice-input";
 import type { Diagnostics } from "@/lib/diagnostics";
@@ -21,7 +15,9 @@ import { type ExportInclude, computeExportBaseName, exportReportAsZip } from "@/
 import { sendToBackground } from "@/lib/messaging";
 import { domSnapshotOpfsFilename } from "@/lib/storage";
 import {
+  type ArchivedRecording,
   type CaptureConfig,
+  DEFAULT_AI_CONTEXT_PROMPT,
   DEFAULT_CAPTURE_CONFIG,
   type NetworkFilterConfig,
   type RingSnapshot,
@@ -30,31 +26,31 @@ import {
   type SessionCounts,
   type SubmitFormValues,
 } from "@/lib/types";
-import { cn } from "@/lib/utils";
 import {
   type DebuggerNetworkEvent as CoreNetworkEvent,
   type NetworkEdit,
   applyNetworkEdits,
+  buildReportMd,
   buildReproSteps,
-} from "@browser-recorder/core";
+} from "@ai-qa-engineer/core";
 import {
   AlertTriangle,
-  ArrowLeftRight,
   Camera,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
-  Code,
+  Copy,
   Download,
-  FileCode,
   FolderOpen,
+  GitBranch,
+  ListTodo,
   MousePointer,
-  Network,
   PlayCircle,
-  Radio,
   RotateCcw,
+  Search,
   Trash2,
   Video,
+  Tag,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -111,60 +107,12 @@ function downloadBlob(blob: Blob, filename: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-function SummaryRow({
-  icon,
-  label,
-  count,
-  badge,
-  items,
-  renderItem,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  count: number;
-  badge?: React.ReactNode;
-  items?: unknown[];
-  renderItem?: (item: unknown, index: number) => React.ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const hasItems = items && items.length > 0;
-
-  return (
-    <div>
-      <button
-        type="button"
-        className={cn(
-          "flex w-full items-center gap-2 py-1.5 text-sm text-left",
-          hasItems ? "cursor-pointer hover:text-foreground" : "cursor-default"
-        )}
-        onClick={() => hasItems && setOpen((v) => !v)}
-        disabled={!hasItems}
-      >
-        {icon}
-        <span className="flex-1 text-muted-foreground">{label}</span>
-        {badge}
-        <span className="font-medium tabular-nums">{count}</span>
-        {hasItems ? (
-          open ? (
-            <ChevronDown className="h-3 w-3 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="h-3 w-3 text-muted-foreground" />
-          )
-        ) : null}
-      </button>
-      {open &&
-        items &&
-        (renderItem ? (
-          <div className="mt-1 mb-2 max-h-48 overflow-auto rounded-md bg-muted p-2 flex flex-col gap-0.5">
-            {items.map((item, i) => renderItem(item, i))}
-          </div>
-        ) : (
-          <pre className="mt-1 mb-2 max-h-48 overflow-auto rounded-md bg-muted p-2 text-xs text-foreground">
-            {JSON.stringify(items.slice(0, 10), null, 2)}
-          </pre>
-        ))}
-    </div>
-  );
+function applyAiContextPrompt(template: string, evidence: string): string {
+  const prompt = template.trim();
+  if (!prompt) return evidence;
+  return prompt.includes("{{CONTEXT}}")
+    ? prompt.replaceAll("{{CONTEXT}}", evidence)
+    : `${prompt}\n\n${evidence}`;
 }
 
 export default function App() {
@@ -219,9 +167,28 @@ export default function App() {
     video: true,
   });
   const [videoBytes, setVideoBytes] = useState(0);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [copyInclude, setCopyInclude] = useState({
+    console: true,
+    network: true,
+    interactions: true,
+  });
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle");
+  const [aiContextPrompt, setAiContextPrompt] = useState(DEFAULT_AI_CONTEXT_PROMPT);
+  const [interactionQuery, setInteractionQuery] = useState("");
+  const [interactionFilter, setInteractionFilter] = useState<"all" | "click" | "navigation">("all");
+  const [activeInteraction, setActiveInteraction] = useState<number | null>(null);
+  const [branchName, setBranchName] = useState("");
 
   const modeRef = useRef<string | null>(null);
   const notesPrefilled = useRef(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    void sendToBackground<{ aiContextPrompt: string }>({ type: "get-settings" })
+      .then(({ aiContextPrompt: prompt }) => setAiContextPrompt(prompt))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -242,7 +209,12 @@ export default function App() {
       if (!filename) return;
       try {
         const handle = await dir.getFileHandle(filename);
-        setVideoBytes((await handle.getFile()).size);
+        const file = await handle.getFile();
+        setVideoBytes(file.size);
+        setVideoUrl((current) => {
+          if (current) URL.revokeObjectURL(current);
+          return URL.createObjectURL(file);
+        });
       } catch {
         // video not yet flushed; size stays 0
       }
@@ -250,10 +222,20 @@ export default function App() {
 
     async function load() {
       try {
-        const [sess, cnts] = await Promise.all([
+        let [sess, cnts] = await Promise.all([
           sendToBackground<Session | null>({ type: "get-session" }),
           sendToBackground<SessionCounts>({ type: "get-counts" }),
         ]);
+        const recordingId = params.get("recordingId");
+        if (recordingId) {
+          const archived = await sendToBackground<ArchivedRecording | null>({
+            type: "get-archived-recording",
+            id: recordingId,
+          });
+          if (!archived) throw new Error("This saved recording is no longer available.");
+          sess = archived.session;
+          cnts = archived.counts;
+        }
         setSession(sess);
         setCounts(cnts);
 
@@ -343,6 +325,7 @@ export default function App() {
               videoOpfsFilename: ring.videoOpfsFilename,
               replayOpfsFilename: null,
               eventsOpfsFilename: null,
+              appBuild: null,
             };
             setSession(ringSession);
             setCounts({
@@ -596,6 +579,16 @@ export default function App() {
     }
   }
 
+  async function copyAiContext(context: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(context);
+      setCopyStatus("copied");
+      setTimeout(() => setCopyStatus("idle"), 2000);
+    } catch {
+      setCopyStatus("error");
+    }
+  }
+
   function handleReset() {
     setScreenshots((prev) => prev.map((s) => ({ ...s, annotatedBlob: null })));
     setExportFilename(null);
@@ -637,7 +630,7 @@ export default function App() {
 
   if (state === "loading") {
     return (
-      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+      <div className="recorder-shell flex min-h-screen items-center justify-center p-6">
         <span className="text-sm text-muted-foreground">Loading…</span>
       </div>
     );
@@ -661,11 +654,11 @@ export default function App() {
 
   if (state === "success") {
     return (
-      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+      <div className="recorder-shell flex min-h-screen items-center justify-center p-6">
         <div className="flex flex-col items-center gap-4 text-center max-w-sm">
           <CheckCircle2 className="h-12 w-12 text-green-500 dark:text-green-400" />
           <div>
-            <p className="font-semibold text-lg">Report exported</p>
+            <p className="font-semibold text-lg">Recording downloaded</p>
             {exportFilename && <p className="text-sm font-medium mt-1">{exportFilename}</p>}
           </div>
           <div className="flex gap-2">
@@ -685,7 +678,7 @@ export default function App() {
             </Button>
             <Button variant="ghost" onClick={handleReset}>
               <RotateCcw className="h-4 w-4" />
-              New report
+              Back to review
             </Button>
           </div>
           <div className="flex flex-col items-center gap-1.5">
@@ -783,424 +776,499 @@ export default function App() {
       key: "video",
       label: "Video",
       bytes: videoBytes,
-      note: "uncheck to download separately below",
+      note: "also available as a separate download",
       toggleable: true,
     },
   ].filter(Boolean) as IncludeRow[];
 
+  const { network: copySafeNetwork, redactedCount: copyRedactedCount } = applyNetworkEdits(
+    debuggerEvents.network as CoreNetworkEvent[],
+    networkEdits
+  );
+  const aiContext = buildReportMd(
+    {
+      title: formValues.title,
+      description: formValues.description,
+      notes: formValues.notes,
+      url: session?.tabUrl,
+      startedAt: session?.startedAt ?? null,
+      consoleEvents: copyInclude.console ? (debuggerEvents.console as DebuggerConsoleEvent[]) : [],
+      networkEvents: copyInclude.network ? copySafeNetwork : [],
+      interactions: copyInclude.interactions
+        ? (debuggerEvents.interactions as DebuggerActionEvent[])
+        : [],
+      redactedFieldCount: copyRedactedCount,
+    },
+    new Date()
+  );
+  const capturedBuild = session?.appBuild;
+  const buildContext = capturedBuild
+    ? [
+        "## Application build",
+        "",
+        "Version: " + (capturedBuild.version ?? "not provided"),
+        "Branch: " + (capturedBuild.branch ?? "not provided"),
+        "Commit: " + (capturedBuild.commit ?? "not provided"),
+        "Built at: " + (capturedBuild.builtAt ?? "not provided"),
+        "Environment: " + (capturedBuild.environment ?? "not provided"),
+      ].join("\n")
+    : [
+        "## Application build",
+        "",
+        "Build information is not available in the captured page.",
+        "Ask the AI to add the standard #app-build element with version, branch, commit, build timestamp, and environment to the application's shared layout.",
+      ].join("\n");
+  const aiCopyContext = applyAiContextPrompt(aiContextPrompt, aiContext + "\n\n" + buildContext);
+  const navigationItems = (debuggerEvents.interactions as DebuggerActionEvent[])
+    .map((ev, index) => {
+      const meta = ev.metadata ?? {};
+      const label = String(
+        meta.label ??
+          meta.text ??
+          (ev.actionType === "navigation" ? (meta.path ?? meta.url) : ev.target) ??
+          "Page interaction"
+      );
+      const seconds = session ? Math.max(0, (ev.timestamp - session.startedAt) / 1000) : 0;
+      return { ev, index, label, seconds };
+    })
+    .filter(({ ev, label }) => {
+      const matchesType = interactionFilter === "all" || ev.actionType === interactionFilter;
+      const query = interactionQuery.trim().toLowerCase();
+      return matchesType && (!query || `${ev.actionType} ${label}`.toLowerCase().includes(query));
+    });
+  const navigationCounts = {
+    click: (debuggerEvents.interactions as DebuggerActionEvent[]).filter((event) => event.actionType === "click").length,
+    navigation: (debuggerEvents.interactions as DebuggerActionEvent[]).filter(
+      (event) => event.actionType === "navigation"
+    ).length,
+  };
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-5xl px-4 py-8">
-        <h1 className="text-xl font-semibold mb-6">Review &amp; export bug report</h1>
+    <div className="recorder-shell">
+      <header className="recorder-masthead">
+        <a className="recorder-brand" href="workspaces.html" aria-label="AI QA Engineer workspaces">
+          <Logo className="recorder-logo" />
+          <span>
+            AI QA Engineer<span className="recorder-brand-caption">RECORDING STUDIO</span>
+          </span>
+        </a>
+        <a className="recorder-workspace-link" href="workspaces.html">
+          <FolderOpen size={16} /> Local workspaces <ChevronRight size={14} />
+        </a>
+      </header>
 
-        <DiagnosticsPanel
-          captureConfig={session?.captureConfig ?? null}
-          counts={counts}
-          diagnostics={diagnostics}
-        />
+      <main className="recorder-main">
+        <div className="recorder-title-row">
+          <div className="recorder-title-block">
+            <p className="recorder-eyebrow">Recording review</p>
+            <h1>{formValues.title || "Untitled recording"}</h1>
+            <div className="recorder-session-meta">
+              <span className="recorder-source">{session?.tabUrl || "Standalone capture"}</span>
+              {session && (
+                <span>
+                  {new Date(session.startedAt).toLocaleString(undefined, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                </span>
+              )}
+            </div>
+          </div>
+          {new URLSearchParams(window.location.search).has("recordingId") && (
+            <span className="recorder-saved">
+              <CheckCircle2 size={14} /> Saved locally
+            </span>
+          )}
+        </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Left: captured data summary */}
-            <div className="rounded-lg border border-border bg-card p-4 flex flex-col gap-1">
-              <p className="text-sm font-medium mb-2">Captured data</p>
-
-              <SummaryRow
-                icon={<Code className="h-4 w-4 text-muted-foreground" />}
-                label="Console"
-                count={counts.console}
-                badge={
-                  counts.errors > 0 ? (
-                    <Badge variant="destructive" className="text-xs px-1.5 py-0">
-                      {counts.errors} errors
-                    </Badge>
-                  ) : undefined
-                }
-                items={debuggerEvents.console}
-                renderItem={(item, i) => {
-                  const ev = item as DebuggerConsoleEvent;
-                  const relSec = session
-                    ? ((ev.timestamp - session.startedAt) / 1000).toFixed(1)
-                    : null;
-                  return (
-                    <div key={i} className="flex items-start gap-2 py-0.5 text-xs">
-                      <span
-                        className={cn(
-                          "shrink-0 rounded px-1 font-mono uppercase text-[10px] leading-5",
-                          ev.level === "error"
-                            ? "bg-destructive/20 text-destructive"
-                            : ev.level === "warn"
-                              ? "bg-yellow-500/20 text-yellow-700"
-                              : "bg-muted-foreground/15 text-muted-foreground"
-                        )}
-                      >
-                        {ev.level}
-                      </span>
-                      <span className="flex-1 break-all text-foreground min-w-0">{ev.message}</span>
-                      <span className="shrink-0 text-muted-foreground/60 text-right tabular-nums text-[10px]">
-                        {relSec ? `+${relSec}s` : ""}
-                        {ev.timestamp ? ` (${new Date(ev.timestamp).toLocaleTimeString()})` : ""}
-                      </span>
-                    </div>
-                  );
-                }}
-              />
-              <Separator />
-              <SummaryRow
-                icon={<Network className="h-4 w-4 text-muted-foreground" />}
-                label="Network"
-                count={counts.network}
-                items={debuggerEvents.network}
-                renderItem={(item, i) => {
-                  const ev = item as DebuggerNetworkEvent;
-                  const relSec = session
-                    ? ((ev.timestamp - session.startedAt) / 1000).toFixed(1)
-                    : null;
-                  return (
-                    <div
-                      key={i}
-                      className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-0.5 text-xs font-mono"
-                    >
-                      <span
-                        className={cn(
-                          "shrink-0 rounded px-1 text-[10px] leading-5",
-                          ev.status !== undefined && ev.status >= 400
-                            ? "bg-destructive/20 text-destructive"
-                            : "bg-muted-foreground/15 text-muted-foreground"
-                        )}
-                      >
-                        {ev.status ?? "—"}
-                      </span>
-                      <span className="shrink-0 text-muted-foreground">{ev.method}</span>
-                      <span className="flex-1 break-all text-foreground min-w-0">{ev.url}</span>
-                      <span className="shrink-0 text-muted-foreground/60 text-right tabular-nums">
-                        {relSec ? `+${relSec}s` : ""}
-                        {ev.timestamp ? ` (${new Date(ev.timestamp).toLocaleTimeString()})` : ""}
-                      </span>
-                    </div>
-                  );
-                }}
-              />
-              <Separator />
-              <SummaryRow
-                icon={<ArrowLeftRight className="h-4 w-4 text-muted-foreground" />}
-                label="WebSocket"
-                count={counts.websocket}
-                items={debuggerEvents.websocket}
-                renderItem={(item, i) => {
-                  const ev = item as DebuggerWebSocketEvent;
-                  const relSec = session
-                    ? ((ev.timestamp - session.startedAt) / 1000).toFixed(1)
-                    : null;
-                  return (
-                    <div
-                      key={i}
-                      className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-0.5 text-xs font-mono"
-                    >
-                      <span
-                        className={cn(
-                          "shrink-0 rounded px-1 text-[10px] leading-5",
-                          ev.event === "send"
-                            ? "bg-blue-500/15 text-blue-700 dark:text-blue-400"
-                            : ev.event === "message"
-                              ? "bg-green-500/15 text-green-700 dark:text-green-400"
-                              : ev.event === "error"
-                                ? "bg-destructive/20 text-destructive"
-                                : "bg-muted-foreground/15 text-muted-foreground"
-                        )}
-                      >
-                        {ev.event === "send" ? "↑" : ev.event === "message" ? "↓" : ev.event}
-                      </span>
-                      <span className="flex-1 break-all text-foreground min-w-0">
-                        {ev.data ?? ev.url}
-                      </span>
-                      <span className="shrink-0 text-muted-foreground/60 text-right tabular-nums">
-                        {relSec ? `+${relSec}s` : ""}
-                        {ev.timestamp ? ` (${new Date(ev.timestamp).toLocaleTimeString()})` : ""}
-                      </span>
-                    </div>
-                  );
-                }}
-              />
-              <Separator />
-              <SummaryRow
-                icon={<Radio className="h-4 w-4 text-muted-foreground" />}
-                label="SSE"
-                count={counts.sse}
-                items={debuggerEvents.sse}
-                renderItem={(item, i) => {
-                  const ev = item as DebuggerSSEEvent;
-                  const relSec = session
-                    ? ((ev.timestamp - session.startedAt) / 1000).toFixed(1)
-                    : null;
-                  return (
-                    <div
-                      key={i}
-                      className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-0.5 text-xs font-mono"
-                    >
-                      <span className="shrink-0 rounded px-1 text-[10px] leading-5 bg-purple-500/15 text-purple-700 dark:text-purple-400">
-                        {ev.eventType ?? ev.event}
-                      </span>
-                      <span className="flex-1 break-all text-foreground min-w-0">
-                        {ev.data ?? ev.url}
-                      </span>
-                      <span className="shrink-0 text-muted-foreground/60 text-right tabular-nums">
-                        {relSec ? `+${relSec}s` : ""}
-                        {ev.timestamp ? ` (${new Date(ev.timestamp).toLocaleTimeString()})` : ""}
-                      </span>
-                    </div>
-                  );
-                }}
-              />
-              <Separator />
-              <SummaryRow
-                icon={<MousePointer className="h-4 w-4 text-muted-foreground" />}
-                label="Interactions"
-                count={counts.interactions}
-                items={debuggerEvents.interactions}
-                renderItem={(item, i) => {
-                  const ev = item as DebuggerActionEvent;
-                  const relSec = session
-                    ? ((ev.timestamp - session.startedAt) / 1000).toFixed(1)
-                    : null;
-                  const meta = ev.metadata ?? {};
-                  return (
-                    <div key={i} className="flex flex-col gap-0 py-0.5 text-xs">
-                      <div className="flex items-center gap-2 font-mono">
-                        <span className="w-20 shrink-0 rounded bg-muted-foreground/15 px-1 text-center">
-                          {ev.actionType}
-                        </span>
-                        <span className="flex-1 truncate text-muted-foreground">
-                          {ev.actionType === "navigation"
-                            ? String(meta.path ?? meta.url ?? "")
-                            : (ev.target ?? "—")}
-                        </span>
-                        {ev.actionType === "input" && meta.valueLength != null && (
-                          <span className="text-muted-foreground shrink-0">
-                            {String(meta.valueLength)} chars
-                          </span>
-                        )}
-                        {ev.actionType === "navigation" && !!meta.mode && (
-                          <span className="text-muted-foreground shrink-0">
-                            {String(meta.mode)}
-                          </span>
-                        )}
-                        <span className="text-muted-foreground/60 shrink-0 text-right tabular-nums">
-                          {relSec ? `+${relSec}s` : ""}
-                          {ev.timestamp ? ` (${new Date(ev.timestamp).toLocaleTimeString()})` : ""}
-                        </span>
-                      </div>
-                      {!!(meta.label ?? meta.text ?? meta.inputType ?? meta.href) && (
-                        <div className="pl-[88px] text-muted-foreground/70 truncate">
-                          {[
-                            meta.label && `"${String(meta.label)}"`,
-                            !meta.label && meta.text && `"${String(meta.text)}"`,
-                            meta.inputType && `type=${String(meta.inputType)}`,
-                            meta.href && String(meta.href),
-                          ]
-                            .filter(Boolean)
-                            .join("  ")}
-                        </div>
-                      )}
-                    </div>
-                  );
-                }}
-              />
-              <Separator />
-              <SummaryRow
-                icon={<FileCode className="h-4 w-4 text-muted-foreground" />}
-                label="DOM snapshots (HTML)"
-                count={counts.domSnapshots}
-                items={domSnapshotKeys.length > 0 ? domSnapshotKeys : undefined}
-                renderItem={(item, i) => (
-                  <div key={i} className="py-0.5 text-xs font-mono text-muted-foreground">
-                    dom-snapshot-{String(item)}.html
-                  </div>
+        <form onSubmit={handleSubmit} className="recorder-layout">
+          <div className="recorder-evidence">
+            <section className="recorder-playback" aria-labelledby="playback-title">
+              <div className="recorder-section-heading">
+                <h2 id="playback-title">
+                  <Video size={16} /> Playback
+                </h2>
+                {videoUrl && (
+                  <button
+                    type="button"
+                    className="recorder-text-button"
+                    disabled={videoDownloading}
+                    onClick={handleVideoDownload}
+                  >
+                    <Download size={14} />
+                    {videoDownloading ? "Downloading…" : "Download video"}
+                  </button>
                 )}
-              />
+              </div>
+              {videoUrl ? (
+                // biome-ignore lint/a11y/useMediaCaption: recordings have no captured caption track; preserve existing audio playback
+                <video
+                  ref={videoRef}
+                  className="recorder-video"
+                  aria-label="Recorded session with captured audio"
+                  controls
+                  src={videoUrl}
+                />
+              ) : (
+                <div className="recorder-video-empty">
+                  <PlayCircle size={38} strokeWidth={1} />
+                  <h3>No video in this recording</h3>
+                  <p>Captured interactions and screenshots are available below.</p>
+                </div>
+              )}
+              <div className="recorder-playback-caption">
+                <span>Session recording</span>
+                <span>
+                  {videoUrl
+                    ? "Audio controls available in player"
+                    : "Video was not captured or is unavailable"}
+                </span>
+              </div>
+            </section>
 
-              {screenshots.length > 0 && (
-                <>
-                  <Separator />
-                  <div className="py-1">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Camera className="h-4 w-4 text-muted-foreground" />
-                      <span className="flex-1 text-muted-foreground">Screenshots</span>
-                      <span className="font-medium tabular-nums">{screenshots.length}</span>
-                    </div>
-                    <div className="mt-1.5 flex flex-col gap-1.5 pl-6">
-                      {screenshots.map((entry, i) => (
-                        // biome-ignore lint/suspicious/noArrayIndexKey: screenshots have no stable ID
-                        <div key={i} className="flex items-center gap-2">
-                          <img
-                            src={entry.dataUrl}
-                            alt={`Screenshot ${i + 1}`}
-                            className="h-10 w-auto shrink-0 rounded border border-border object-contain"
-                          />
-                          <span className="flex-1 text-xs text-muted-foreground">#{i + 1}</span>
-                          {entry.annotatedBlob && (
-                            <Badge variant="secondary" className="text-[10px] px-1 py-0">
-                              annotated
-                            </Badge>
-                          )}
-                          <button
-                            type="button"
-                            className="text-xs text-primary hover:underline"
-                            onClick={() => openAnnotation(i)}
-                          >
+            <section className="recorder-screenshots" aria-labelledby="screenshots-title">
+              <div className="recorder-section-heading">
+                <h2 id="screenshots-title">
+                  <Camera size={16} /> Screenshots{" "}
+                  <span className="recorder-count">{screenshots.length}</span>
+                </h2>
+                <span className="recorder-helper">Captured during this session</span>
+              </div>
+              {screenshots.length ? (
+                <div className="recorder-gallery">
+                  {screenshots.map((entry, i) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: captured screenshots have no stable id
+                    <figure className="recorder-shot" key={i}>
+                      <button
+                        type="button"
+                        className="recorder-shot-preview"
+                        onClick={() => openAnnotation(i)}
+                        aria-label={`Open screenshot ${i + 1} for annotation`}
+                      >
+                        <img src={entry.dataUrl} alt={`Captured screenshot ${i + 1}`} />
+                      </button>
+                      <figcaption>
+                        <span>
+                          <b>{String(i + 1).padStart(2, "0")}</b>{" "}
+                          {entry.annotatedBlob ? "Annotated" : "Screenshot"}
+                        </span>
+                        <div>
+                          <button type="button" onClick={() => openAnnotation(i)}>
                             Annotate
                           </button>
                           <button
                             type="button"
-                            className="text-muted-foreground hover:text-destructive transition-colors"
+                            className="recorder-remove"
+                            aria-label={`Remove screenshot ${i + 1}`}
                             onClick={() => handleDeleteScreenshot(i)}
-                            aria-label={`Delete screenshot ${i + 1}`}
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 size={14} />
                           </button>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
+              ) : (
+                <div className="recorder-empty">
+                  <Camera size={20} />
+                  <p>No screenshots captured in this session.</p>
+                </div>
               )}
+            </section>
 
-              {session?.videoOpfsFilename && (
-                <>
-                  <Separator />
-                  <div className="flex items-center gap-2 py-1.5 text-sm">
-                    <Video className="h-4 w-4 text-muted-foreground" />
-                    <span className="flex-1 text-muted-foreground">Recording</span>
-                    <button
-                      type="button"
-                      className="text-xs text-primary hover:underline disabled:opacity-50"
-                      disabled={videoDownloading}
-                      onClick={handleVideoDownload}
-                    >
-                      {videoDownloading ? "Downloading…" : "Download"}
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {replayEvents.length > 1 && (
-                <>
-                  <Separator />
-                  <div className="flex items-center gap-2 py-1.5 text-sm">
-                    <PlayCircle className="h-4 w-4 text-muted-foreground" />
-                    <span className="flex-1 text-muted-foreground">Session replay</span>
-                    <Badge variant="secondary" className="text-[10px] px-1 py-0">
-                      experimental
-                    </Badge>
-                    <span className="font-medium tabular-nums">{replayEvents.length} events</span>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Right: report form */}
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
+            <details className="recorder-details">
+              <summary>
+                Recording details <span>Title, description & notes</span>
+              </summary>
+              <div className="recorder-details-body">
                 <Label htmlFor="title">Title</Label>
                 <Input
                   id="title"
                   value={formValues.title}
                   onChange={(e) => setFormValues((v) => ({ ...v, title: e.target.value }))}
-                  required
                 />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="description">Description</Label>
                   <MicButton
                     value={formValues.description}
-                    onChange={(v) => setFormValues((fv) => ({ ...fv, description: v }))}
+                    onChange={(description) => setFormValues((v) => ({ ...v, description }))}
                   />
                 </div>
                 <Textarea
                   id="description"
                   rows={3}
-                  placeholder="What broke? When does it happen?"
                   value={formValues.description}
                   onChange={(e) => setFormValues((v) => ({ ...v, description: e.target.value }))}
                 />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="notes">
-                    Notes
-                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                      steps, hypotheses
-                    </span>
-                  </Label>
+                  <Label htmlFor="notes">Notes & reproduction steps</Label>
                   <MicButton
                     value={formValues.notes}
-                    onChange={(v) => setFormValues((fv) => ({ ...fv, notes: v }))}
+                    onChange={(notes) => setFormValues((v) => ({ ...v, notes }))}
                   />
                 </div>
                 <Textarea
                   id="notes"
-                  rows={3}
-                  placeholder="1. Go to…&#10;2. Click…&#10;3. See error"
+                  rows={4}
                   value={formValues.notes}
                   onChange={(e) => setFormValues((v) => ({ ...v, notes: e.target.value }))}
                 />
-                {notesPrefilled.current && (
-                  <p className="text-xs text-muted-foreground">
-                    Pre-filled from your interactions — edit as needed.
+              </div>
+            </details>
+            <details className="recorder-details">
+              <summary>
+                Capture settings & privacy <span>Review technical details</span>
+              </summary>
+              <div className="recorder-details-body">
+                <DiagnosticsPanel
+                  captureConfig={session?.captureConfig ?? null}
+                  counts={counts}
+                  diagnostics={diagnostics}
+                />
+                <NetworkPrivacyReview
+                  events={debuggerEvents.network as CoreNetworkEvent[]}
+                  edits={networkEdits}
+                  onChange={setNetworkEdits}
+                  replayTabId={session?.tabId}
+                />
+                {replayEvents.length > 1 && (
+                  <div>
+                    <h3 className="mb-3 text-sm font-medium">Session replay · Experimental</h3>
+                    <ReplayPlayer events={replayEvents} stripAutofocus={replayStripAutofocus} />
+                  </div>
+                )}
+              </div>
+            </details>
+          </div>
+
+          <aside className="recorder-sidebar" aria-label="Interactions and export">
+            <section className="recorder-change-context" aria-labelledby="change-context-title">
+              <div className="recorder-change-context-heading">
+                <GitBranch size={16} />
+                <h2 id="change-context-title">Change context</h2>
+              </div>
+              <label>
+                <span>Branch / task</span>
+                <input
+                  value={branchName}
+                  onChange={(event) => setBranchName(event.target.value)}
+                  placeholder={capturedBuild?.branch ?? "e.g. sam_task_123"}
+                  aria-label="Branch or task reference"
+                />
+              </label>
+              {capturedBuild ? (
+                <div className="recorder-build-values">
+                  <span><Tag size={13} /> v{capturedBuild.version ?? "unknown"}</span>
+                  <span>{capturedBuild.commit ? "commit " + capturedBuild.commit : "commit unavailable"}</span>
+                  <span>{capturedBuild.environment ?? "environment unavailable"}</span>
+                  {capturedBuild.builtAt && <span>{new Date(capturedBuild.builtAt).toLocaleString()}</span>}
+                </div>
+              ) : (
+                <p className="recorder-build-unavailable">
+                  Build info unavailable. The AI context will request the shared <code>#app-build</code> layout marker.
+                </p>
+              )}
+              <div className="recorder-version"><Tag size={13} /> Extension v{chrome.runtime.getManifest().version}</div>
+            </section>
+
+            <section className="recorder-reproduction-notes" aria-labelledby="reproduction-notes-title">
+              <div className="recorder-reproduction-notes-heading">
+                <ListTodo size={16} />
+                <h2 id="reproduction-notes-title">Notes &amp; reproduction steps</h2>
+              </div>
+              {formValues.notes.trim() ? (
+                <p>{formValues.notes}</p>
+              ) : (
+                <p className="recorder-notes-empty">No notes yet. Add them in Recording details.</p>
+              )}
+            </section>
+
+            <section className="recorder-timeline" aria-labelledby="interactions-title">
+              <div className="recorder-section-heading">
+                <h2 id="interactions-title">
+                  <MousePointer size={16} /> Session navigation{" "}
+                  <span className="recorder-count">{debuggerEvents.interactions.length}</span>
+                </h2>
+                <span className="recorder-helper">Jump to evidence</span>
+              </div>
+              <div className="recorder-navigation-tools">
+                <label className="recorder-navigation-search">
+                  <Search size={14} />
+                  <input
+                    type="search"
+                    value={interactionQuery}
+                    onChange={(e) => setInteractionQuery(e.target.value)}
+                    placeholder="Find an interaction"
+                    aria-label="Find an interaction"
+                  />
+                </label>
+                <div className="recorder-navigation-filters" role="group" aria-label="Filter interactions">
+                  {(["all", "click", "navigation"] as const).map((filter) => (
+                    <button
+                      type="button"
+                      key={filter}
+                      className={interactionFilter === filter ? "is-active" : ""}
+                      onClick={() => setInteractionFilter(filter)}
+                    >
+                      {filter === "all"
+                        ? `All ${debuggerEvents.interactions.length}`
+                        : filter === "click"
+                          ? `Clicks ${navigationCounts.click}`
+                          : `Pages ${navigationCounts.navigation}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {debuggerEvents.interactions.length ? (
+                <ol
+                  className="recorder-events"
+                  // biome-ignore lint/a11y/noNoninteractiveTabindex: allow keyboard scrolling of the timeline
+                  tabIndex={0}
+                  aria-label="Recorded interaction timeline"
+                >
+                  {navigationItems.map(({ ev, index, label, seconds }) => {
+                    // Auto-captures are written in interaction order. A screenshot icon is
+                    // shown only when this event has a corresponding saved frame.
+                    const linkedScreenshot = session?.captureConfig.autoScreenshotOnInteraction
+                      ? screenshots[index]
+                      : undefined;
+                    return (
+                      <li className="recorder-event-row" data-action={ev.actionType} key={`${ev.timestamp}-${index}`}>
+                        <button
+                          type="button"
+                          className={activeInteraction === index ? "is-active" : ""}
+                          onClick={() => {
+                            setActiveInteraction(index);
+                            if (videoRef.current) {
+                              videoRef.current.currentTime = seconds;
+                              void videoRef.current.play().catch(() => {});
+                            }
+                          }}
+                        >
+                          <time className="recorder-event-time">
+                            {`${Math.floor(seconds / 60).toString().padStart(2, "0")}:${Math.floor(seconds % 60)
+                              .toString()
+                              .padStart(2, "0")}`}
+                          </time>
+                          <span className="recorder-event-type">{ev.actionType}</span>
+                          <span className="recorder-event-label" title={label}>{label}</span>
+                          {linkedScreenshot && (
+                            <span className="recorder-event-screenshot">
+                              <Camera size={14} aria-label="Screenshot captured for this interaction" />
+                              <span className="recorder-event-screenshot-popover" role="tooltip">
+                                <img src={linkedScreenshot.dataUrl} alt={`Screenshot for interaction ${index + 1}`} />
+                              </span>
+                            </span>
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : (
+                <div className="recorder-empty">
+                  <MousePointer size={20} />
+                  <p>No interactions captured.</p>
+                </div>
+              )}
+            </section>
+
+            <section className="recorder-handoff" aria-labelledby="context-title">
+              <div className="recorder-handoff-heading">
+                <span className="recorder-eyebrow">Continue your work</span>
+                <h2 id="context-title">Take the context with you.</h2>
+                <p>Choose what your AI receives.</p>
+              </div>
+              <fieldset className="recorder-copy-options">
+                <legend className="sr-only">Include in AI context</legend>
+                {(
+                  [
+                    ["interactions", "Interactions", debuggerEvents.interactions.length],
+                    ["console", "Console logs", debuggerEvents.console.length],
+                    ["network", "Network requests", debuggerEvents.network.length],
+                  ] as const
+                ).map(([key, label, count]) => (
+                  <label key={key}>
+                    <input
+                      type="checkbox"
+                      checked={copyInclude[key]}
+                      onChange={() => setCopyInclude((v) => ({ ...v, [key]: !v[key] }))}
+                    />
+                    <span>{label}</span>
+                    <small>{count}</small>
+                  </label>
+                ))}
+              </fieldset>
+              <Button
+                type="button"
+                className="recorder-copy-button"
+                onClick={() => void copyAiContext(aiCopyContext)}
+              >
+                {copyStatus === "copied" ? <CheckCircle2 size={16} /> : <Copy size={16} />}
+                <span aria-live="polite">
+                  {copyStatus === "copied"
+                    ? "Copied to clipboard"
+                    : copyStatus === "error"
+                      ? "Could not copy — try again"
+                      : "Copy context for AI"}
+                </span>
+              </Button>
+              <p className="recorder-copy-note">Title and notes included. Ready to paste.</p>
+              <div className="recorder-save-section">
+                <div className="recorder-save-heading">
+                  <FolderOpen size={18} />
+                  <div>
+                    <h3>Keep a local copy</h3>
+                    <p>
+                      Review saved recordings in <a href="workspaces.html">local workspaces</a>.
+                    </p>
+                  </div>
+                </div>
+                {!isSingleFileExport && (
+                  <details className="recorder-package">
+                    <summary>
+                      Choose download contents <ChevronDown size={14} />
+                    </summary>
+                    <IncludeOptions
+                      rows={includeRows}
+                      value={include as unknown as Record<string, boolean>}
+                      onToggle={(key) =>
+                        setInclude((v) => ({ ...v, [key]: !v[key as keyof ExportInclude] }))
+                      }
+                      heading="Include in download"
+                      description="Only selected artifacts are added to your ZIP."
+                    />
+                  </details>
+                )}
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  variant="outline"
+                  className="recorder-download-button"
+                >
+                  <Download size={16} />
+                  {isSubmitting
+                    ? "Preparing download…"
+                    : isSingleFileExport
+                      ? singleFileLabel
+                      : "Download recording"}
+                </Button>
+                {exportError && (
+                  <p role="alert" className="recorder-error">
+                    <AlertTriangle size={14} />
+                    {exportError}
                   </p>
                 )}
               </div>
-            </div>
-          </div>
-
-          {!isSingleFileExport && (
-            <div className="mt-6 flex flex-col gap-4">
-              <NetworkPrivacyReview
-                events={debuggerEvents.network as CoreNetworkEvent[]}
-                edits={networkEdits}
-                onChange={setNetworkEdits}
-                replayTabId={session?.tabId}
-              />
-              <IncludeOptions
-                rows={includeRows}
-                value={include as unknown as Record<string, boolean>}
-                onToggle={(key) =>
-                  setInclude((v) => ({ ...v, [key]: !v[key as keyof ExportInclude] }))
-                }
-              />
-            </div>
-          )}
-
-          <div className="mt-6 flex flex-col gap-3">
-            {exportError && (
-              <div className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-                {exportError}
-              </div>
-            )}
-            <Button type="submit" disabled={isSubmitting} className="w-full">
-              <Download className="h-4 w-4" />
-              {isSubmitting ? "Exporting…" : isSingleFileExport ? singleFileLabel : "Export ZIP"}
-            </Button>
-          </div>
-
-          {replayEvents.length > 1 && (
-            <div className="mt-6 flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <PlayCircle className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Session replay</span>
-                <Badge variant="secondary" className="text-[10px] px-1 py-0">
-                  experimental
-                </Badge>
-              </div>
-              <ReplayPlayer events={replayEvents} stripAutofocus={replayStripAutofocus} />
-            </div>
-          )}
+            </section>
+          </aside>
         </form>
-      </div>
+        <footer className="recorder-footer">
+          <span>AI QA Engineer</span>
+          <span>Review. Understand. Reproduce.</span>
+        </footer>
+      </main>
     </div>
   );
 }

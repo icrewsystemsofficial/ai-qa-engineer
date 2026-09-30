@@ -69,10 +69,19 @@ import {
   type SessionCounts,
 } from "@/lib/types";
 import { reportNonFatalError, setErrorSink } from "@/shared/lib/errors";
+import {
+  archiveRecording,
+  getArchivedRecordings,
+  getRecordingWorkspaces,
+  removeArchivedRecordings,
+} from "@/lib/workspaces";
 
 // ─── Timing constants ────────────────────────────────────────────────────────
 
 const INTERACTION_CAPTURE_DEBOUNCE_MS = 1500;
+// Let the click's UI update paint before its screenshot is captured. Each
+// click is queued independently: screenshots must never be coalesced.
+const AUTO_SCREENSHOT_SETTLE_MS = 300;
 const COUNT_PERSIST_DEBOUNCE_MS = 500;
 // Popup needs ~300 ms to close before tab screenshot is taken
 const SCREENSHOT_POPUP_DISMISS_MS = 300;
@@ -109,6 +118,30 @@ function emptyCounts(): SessionCounts {
     screenshots: 0,
     errors: 0,
   };
+}
+
+function recordingFiles(session: Session): string[] {
+  return [
+    ...session.screenshotFilenames,
+    ...session.domSnapshotKeys.map((key) => domSnapshotOpfsFilename(session.id, key)),
+    ...(session.videoOpfsFilename ? [session.videoOpfsFilename] : []),
+    ...(session.replayOpfsFilename ? [session.replayOpfsFilename] : []),
+    ...(session.eventsOpfsFilename ? [session.eventsOpfsFilename] : []),
+  ];
+}
+
+async function archiveCompletedRecording(session: Session, counts: SessionCounts): Promise<void> {
+  const files = recordingFiles(session);
+  const dir = await navigator.storage.getDirectory();
+  let bytes = 0;
+  for (const filename of files) {
+    try {
+      bytes += (await (await dir.getFileHandle(filename)).getFile()).size;
+    } catch {
+      // The capture may have been disabled or a file may have failed to persist.
+    }
+  }
+  await archiveRecording(session, counts, files, bytes);
 }
 
 // ─── Ring state ───────────────────────────────────────────────────────────────
@@ -295,6 +328,12 @@ async function initState(): Promise<void> {
     }
   }
   bgCounts = await getCounts();
+  // A recorder page can survive an extension reload after Stop was pressed.
+  // Ensure that completed capture is promoted into the durable library before
+  // any OPFS cleanup runs.
+  if (bgSession?.status === "stopping") {
+    await archiveCompletedRecording(bgSession, bgCounts);
+  }
   ringConfig = await getRingConfig();
   ringPins = await getRingPins();
   ringEnabled = ringConfig.enabled;
@@ -330,18 +369,26 @@ function bumpCount(field: keyof Omit<SessionCounts, "errors">, by = 1): void {
 
 // ─── Debounce timers ─────────────────────────────────────────────────────────
 
-let autoSsTimer: ReturnType<typeof setTimeout> | null = null;
 let autoDomTimer: ReturnType<typeof setTimeout> | null = null;
+let autoScreenshotChain: Promise<void> = Promise.resolve();
 
 function clearAutoCaptureTimers() {
-  if (autoSsTimer) {
-    clearTimeout(autoSsTimer);
-    autoSsTimer = null;
-  }
   if (autoDomTimer) {
     clearTimeout(autoDomTimer);
     autoDomTimer = null;
   }
+}
+
+function queueAutoScreenshot(tabId: number): void {
+  autoScreenshotChain = autoScreenshotChain
+    .then(
+      () =>
+        new Promise<void>((resolve) => {
+          setTimeout(resolve, AUTO_SCREENSHOT_SETTLE_MS);
+        })
+    )
+    .then(() => captureAutoScreenshot(tabId))
+    .catch((err) => reportNonFatalError("Auto-screenshot queue failed", err));
 }
 
 // ─── Debugger event streaming to OPFS ────────────────────────────────────────
@@ -446,15 +493,26 @@ function isOffscreenMessage(msg: unknown): msg is OffscreenMsg {
 
 // ─── Firefox video messages ───────────────────────────────────────────────────
 
-type FxVideoMsg = { type: "fx-video-done"; filename: string };
+type FxVideoMsg =
+  | { type: "fx-video-ready"; sessionId: string }
+  | { type: "fx-video-done"; filename: string };
 
 function isFxVideoMessage(msg: unknown): msg is FxVideoMsg {
   return (
-    typeof msg === "object" && msg !== null && (msg as { type?: unknown }).type === "fx-video-done"
+    typeof msg === "object" &&
+    msg !== null &&
+    ((msg as { type?: unknown }).type === "fx-video-ready" ||
+      (msg as { type?: unknown }).type === "fx-video-done")
   );
 }
 
-function handleFxVideoMessage(msg: FxVideoMsg): void {
+async function handleFxVideoMessage(msg: FxVideoMsg): Promise<void> {
+  if (msg.type === "fx-video-ready") {
+    if (bgSession?.id === msg.sessionId && bgSession.status === "starting") {
+      await activatePendingSession();
+    }
+    return;
+  }
   if (bgSession) {
     bgSession.videoOpfsFilename = msg.filename;
     void persistSession();
@@ -462,6 +520,38 @@ function handleFxVideoMessage(msg: FxVideoMsg): void {
   firefoxVideoDoneResolve?.();
   firefoxVideoDoneResolve = null;
   firefoxVideoTabId = null;
+}
+
+async function activatePendingSession(): Promise<void> {
+  if (!bgSession || bgSession.status !== "starting") return;
+  const session = bgSession;
+  const { networkFilter } = await getSettings();
+  try {
+    const { sessionId: dbgId } = await debuggerBridge.startSession(session.tabId, {
+      ...session.captureConfig,
+      network: networkFilter,
+    });
+    session.debuggerSessionId = dbgId;
+  } catch (err) {
+    reportNonFatalError("Failed to start debugger session", err);
+    bgSession = null;
+    await persistSession();
+    await resumeRingAfterSession();
+    return;
+  }
+
+  session.status = "recording";
+  session.appBuild = await captureAppBuildInfo(session.tabId);
+  await persistSession();
+  if (session.captureConfig.domSnapshots) {
+    await captureAndStoreDomSnapshot(session.tabId, "start");
+  }
+  if (session.captureConfig.replay) {
+    await injectReplayRecorderIntoTab(session.tabId);
+  }
+  if (session.captureConfig.video) markStageOk("video", "start");
+  chrome.action.setBadgeText({ text: "REC" });
+  chrome.action.setBadgeBackgroundColor({ color: "#ef4444" });
 }
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
@@ -550,7 +640,8 @@ export default defineBackground(() => {
         let interactionsN = 0;
         let websocketN = 0;
         let sseN = 0;
-        let hasAutoTriggerAction = false;
+        let hasAutoDomTriggerAction = false;
+        let autoScreenshotClicks = 0;
         for (const e of events) {
           if (e.kind === "console") consoleN++;
           else if (e.kind === "network") networkN++;
@@ -558,12 +649,13 @@ export default defineBackground(() => {
           else if (e.kind === "sse") sseN++;
           else if (e.kind === "action") {
             interactionsN++;
+            if (e.actionType === "click") autoScreenshotClicks++;
             if (
               e.actionType === "click" ||
               e.actionType === "change" ||
               (e.actionType === "navigation" && e.metadata?.mode !== "initial")
             ) {
-              hasAutoTriggerAction = true;
+              hasAutoDomTriggerAction = true;
             }
           }
         }
@@ -577,15 +669,13 @@ export default defineBackground(() => {
           appendDebuggerEventsToOpfs(events);
         }
 
-        if (hasAutoTriggerAction) {
-          if (bgSession.captureConfig.autoScreenshotOnInteraction) {
-            if (autoSsTimer) clearTimeout(autoSsTimer);
-            autoSsTimer = setTimeout(() => {
-              autoSsTimer = null;
-              void captureAutoScreenshot(tabId);
-            }, INTERACTION_CAPTURE_DEBOUNCE_MS);
+        if (bgSession.captureConfig.autoScreenshotOnInteraction) {
+          for (let index = 0; index < autoScreenshotClicks; index++) {
+            queueAutoScreenshot(tabId);
           }
+        }
 
+        if (hasAutoDomTriggerAction) {
           if (bgSession.captureConfig.autoDomSnapshotOnInteraction) {
             if (autoDomTimer) clearTimeout(autoDomTimer);
             autoDomTimer = setTimeout(() => {
@@ -667,10 +757,16 @@ export default defineBackground(() => {
   chrome.tabs.onRemoved.addListener(async (tabId) => {
     await backgroundReady;
     if (tabId === firefoxVideoTabId) {
-      // User closed the video capture tab — treat as a clean stop.
+      // Closing capture before it is ready must cancel the pending session.
+      // Otherwise the popup remains indefinitely in “Waiting for video
+      // selection” with no document left that can ever emit fx-video-ready.
+      const wasPendingVideoSelection = bgSession?.status === "starting";
       firefoxVideoTabId = null;
       firefoxVideoDoneResolve?.();
       firefoxVideoDoneResolve = null;
+      if (wasPendingVideoSelection) {
+        await handleMessage({ type: "discard-session" });
+      }
       return;
     }
 
@@ -771,11 +867,41 @@ async function handleMessage(message: BgMessage) {
       await clearErrorLog();
       return ok(undefined);
 
+    case "get-recording-workspaces":
+      return ok(await getRecordingWorkspaces());
+
+    case "get-archived-recording": {
+      const recording = (await getArchivedRecordings()).find((item) => item.id === message.id) ?? null;
+      return ok(recording);
+    }
+
+    case "delete-archived-recordings": {
+      const removed = await removeArchivedRecordings(message.ids);
+      const dir = await navigator.storage.getDirectory();
+      for (const recording of removed) {
+        for (const filename of recording.files) {
+          await dir.removeEntry(filename).catch(() => {});
+        }
+      }
+      return ok(removed.length);
+    }
+
     case "get-settings":
       return ok(await getSettings());
 
+    case "save-capture-config": {
+      const { networkFilter, videoConfig, aiContextPrompt } = await getSettings();
+      await saveSettings(message.captureConfig, networkFilter, videoConfig, aiContextPrompt);
+      return ok(undefined);
+    }
+
     case "save-settings":
-      await saveSettings(message.captureConfig, message.networkFilter, message.videoConfig);
+      await saveSettings(
+        message.captureConfig,
+        message.networkFilter,
+        message.videoConfig,
+        message.aiContextPrompt
+      );
       return ok(undefined);
 
     case "start-session": {
@@ -802,6 +928,7 @@ async function handleMessage(message: BgMessage) {
         videoOpfsFilename: null,
         replayOpfsFilename: null,
         eventsOpfsFilename: null,
+        appBuild: null,
       };
       eventsWriteChain = Promise.resolve();
 
@@ -817,44 +944,20 @@ async function handleMessage(message: BgMessage) {
       if (cc.replay) expectStage("replay", "inject");
       if (cc.video) expectStage("video", "start");
 
-      const { networkFilter } = await getSettings();
-      try {
-        const { sessionId: dbgId } = await debuggerBridge.startSession(tab.id, {
-          ...message.captureConfig,
-          network: networkFilter,
-        });
-        bgSession.debuggerSessionId = dbgId;
-      } catch (err) {
-        reportNonFatalError("Failed to start debugger session", err);
-        bgSession = null;
-        await persistSession();
-        await resumeRingAfterSession();
-        return fail("Network capture could not start for this page.");
-      }
-
-      bgSession.status = "recording";
-      await persistSession();
-
-      if (message.captureConfig.domSnapshots) {
-        await captureAndStoreDomSnapshot(tab.id, "start");
-      }
-
-      if (message.captureConfig.replay) {
-        await injectReplayRecorderIntoTab(tab.id);
-      }
-
       if (message.captureConfig.video) {
-        if ("tabCapture" in chrome) {
+        const { videoConfig } = await getSettings();
+        if ("tabCapture" in chrome && videoConfig.source === "tab") {
           await startVideoCapture(tab.id, bgSession);
         } else {
           await startFirefoxVideoCapture(bgSession);
         }
-        markStageOk("video", "start");
+        // The visible capture window reports fx-video-ready only after Chrome
+        // has granted/share-selected the video stream. Until then this is
+        // deliberately not a recording session.
+        return ok(bgSession);
       }
 
-      chrome.action.setBadgeText({ text: "REC" });
-      chrome.action.setBadgeBackgroundColor({ color: "#ef4444" });
-
+      await activatePendingSession();
       return ok(bgSession);
     }
 
@@ -876,10 +979,16 @@ async function handleMessage(message: BgMessage) {
         await replayWriteChain;
       }
       await eventsWriteChain;
+      // Stop the debugger bridge as part of Stop, not when the report tab is
+      // closed. Leaving it attached meant events continued accumulating while
+      // the user reviewed their report.
+      if (bgSession.debuggerSessionId) {
+        await debuggerBridge.discardSession(bgSession.debuggerSessionId);
+        bgSession.debuggerSessionId = null;
+        await persistSession();
+      }
       if (bgSession.captureConfig.video) {
-        if ("tabCapture" in chrome) {
-          await stopVideoCapture();
-        } else if (firefoxVideoTabId) {
+        if (firefoxVideoTabId) {
           firefoxVideoDonePromise = new Promise((resolve) => {
             firefoxVideoDoneResolve = resolve;
           });
@@ -894,12 +1003,22 @@ async function handleMessage(message: BgMessage) {
             new Promise<void>((r) => setTimeout(r, 10_000)),
           ]);
           firefoxVideoTabId = null;
+        } else if ("tabCapture" in chrome) {
+          await stopVideoCapture();
         }
       }
       await flushDiagnostics();
+      await archiveCompletedRecording(bgSession, bgCounts);
       chrome.action.setBadgeText({ text: "" });
+      const completedRecordingId = bgSession.id;
+      // A stopped recording is now a durable workspace item. Clear the active
+      // session before opening the report so the badge/popup cannot remain in
+      // the misleading “Stopping…” state and no capture code can keep writing.
+      bgSession = null;
+      bgCounts = emptyCounts();
+      await setSession(null);
       const recorderTab = await chrome.tabs.create({
-        url: chrome.runtime.getURL(`/recorder.html?sessionId=${bgSession.id}`),
+        url: chrome.runtime.getURL(`/recorder.html?recordingId=${completedRecordingId}`),
       });
       recorderTabId = recorderTab.id ?? null;
       await resumeRingAfterSession();
@@ -942,31 +1061,27 @@ async function handleMessage(message: BgMessage) {
       recorderTabId = null;
       clearAutoCaptureTimers();
       if (bgSession?.captureConfig.video) {
-        if ("tabCapture" in chrome) {
-          await stopVideoCapture();
-        } else if (firefoxVideoTabId) {
+        if (firefoxVideoTabId) {
           chrome.tabs.remove(firefoxVideoTabId).catch(() => {});
           firefoxVideoDoneResolve?.();
           firefoxVideoDoneResolve = null;
           firefoxVideoTabId = null;
+        } else if ("tabCapture" in chrome) {
+          await stopVideoCapture();
         }
       }
       if (bgSession?.debuggerSessionId) {
         await debuggerBridge.discardSession(bgSession.debuggerSessionId);
       }
       if (bgSession) {
-        const dir = await navigator.storage.getDirectory();
-        for (const filename of bgSession.screenshotFilenames) {
-          await dir.removeEntry(filename).catch(() => {});
-        }
-        for (const key of bgSession.domSnapshotKeys) {
-          await dir.removeEntry(domSnapshotOpfsFilename(bgSession.id, key)).catch(() => {});
-        }
-        if (bgSession.replayOpfsFilename) {
-          await dir.removeEntry(bgSession.replayOpfsFilename).catch(() => {});
-        }
-        if (bgSession.eventsOpfsFilename) {
-          await dir.removeEntry(bgSession.eventsOpfsFilename).catch(() => {});
+        const archived = (await getArchivedRecordings()).some(
+          (recording) => recording.id === bgSession?.id
+        );
+        if (!archived) {
+          const dir = await navigator.storage.getDirectory();
+          for (const filename of recordingFiles(bgSession)) {
+            await dir.removeEntry(filename).catch(() => {});
+          }
         }
       }
       chrome.action.setBadgeText({ text: "" });
@@ -1148,6 +1263,31 @@ async function handleCommand(command: string) {
 
 // ─── Capture helpers ─────────────────────────────────────────────────────────
 
+async function captureAppBuildInfo(
+  tabId: number
+): Promise<import("@/lib/types").AppBuildInfo | null> {
+  try {
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const build = document.querySelector<HTMLElement>("#app-build");
+        if (!build) return null;
+        return {
+          version: build.dataset.appVersion ?? null,
+          branch: build.dataset.appBranch ?? null,
+          commit: build.dataset.appCommit ?? null,
+          builtAt: build.dataset.appBuiltAt ?? null,
+          environment: build.dataset.appEnvironment ?? null,
+        };
+      },
+    });
+    return (result?.result as import("@/lib/types").AppBuildInfo | undefined) ?? null;
+  } catch {
+    // Build metadata is optional and unavailable on browser/internal pages.
+    return null;
+  }
+}
+
 async function captureAndStoreDomSnapshot(tabId: number, key: string): Promise<void> {
   try {
     const [result] = await chrome.scripting.executeScript({
@@ -1209,7 +1349,7 @@ function serializeDom(): string {
 }
 
 async function captureAutoScreenshot(tabId: number): Promise<void> {
-  if (!bgSession || bgSession.tabId !== tabId || bgSession.status === "paused") return;
+  if (!bgSession || bgSession.tabId !== tabId || bgSession.status !== "recording") return;
   try {
     const tab = await chrome.tabs.get(tabId);
     if (!tab.windowId) return;
@@ -1241,22 +1381,18 @@ async function captureAutoDomSnapshot(tabId: number): Promise<void> {
 // ─── Video capture ────────────────────────────────────────────────────────────
 
 async function startFirefoxVideoCapture(session: Session): Promise<void> {
-  const filename = `${OPFS_PREFIX}fx-recording-${session.id}.webm`;
+  const { videoConfig } = await getSettings();
+  const filename = `${OPFS_PREFIX}display-recording-${session.id}.webm`;
   // Set the filename now so the recorder can find the file even if the video
   // tab finishes before the recorder opens (or the session crashes).
   session.videoOpfsFilename = filename;
   await persistSession();
 
-  const tabTitle = encodeURIComponent(session.tabTitle ?? "");
-  const url = chrome.runtime.getURL(
-    `/firefox-video.html?sessionId=${session.id}&tabTitle=${tabTitle}&filename=${encodeURIComponent(filename)}`
-  );
-  const tab = await chrome.tabs.create({ url });
-  firefoxVideoTabId = tab.id ?? null;
+  await openVisibleVideoCapture(session, filename, videoConfig);
 }
 
 async function startVideoCapture(tabId: number, session: Session): Promise<void> {
-  if (!("tabCapture" in chrome) || !("offscreen" in chrome)) return;
+  if (!("tabCapture" in chrome)) return;
 
   const { videoConfig } = await getSettings();
   const ext = videoConfig.format === "h264" ? ".mp4" : ".webm";
@@ -1279,25 +1415,39 @@ async function startVideoCapture(tabId: number, session: Session): Promise<void>
     return;
   }
 
-  try {
-    await chrome.offscreen.createDocument({
-      url: chrome.runtime.getURL("offscreen.html"),
-      reasons: ["USER_MEDIA" as chrome.offscreen.Reason],
-      justification: "Record tab video via tabCapture getUserMedia",
-    });
-  } catch (err) {
-    reportNonFatalError("Failed to create offscreen document", err);
-    session.videoOpfsFilename = null;
-    await persistSession();
-    return;
-  }
+  await openVisibleVideoCapture(session, filename, videoConfig, streamId);
+}
 
-  await chrome.runtime.sendMessage({
-    type: "offscreen-start-recording",
-    streamId,
-    filename,
-    videoConfig,
+async function openVisibleVideoCapture(
+  session: Session,
+  filename: string,
+  videoConfig: Awaited<ReturnType<typeof getSettings>>["videoConfig"],
+  streamId?: string
+): Promise<void> {
+  const tabTitle = encodeURIComponent(session.tabTitle ?? "");
+  const config = encodeURIComponent(JSON.stringify(videoConfig));
+  const stream = streamId ? `&streamId=${encodeURIComponent(streamId)}` : "";
+  const url = chrome.runtime.getURL(
+    `/firefox-video.html?sessionId=${session.id}&tabTitle=${tabTitle}&filename=${encodeURIComponent(filename)}&config=${config}${stream}`
+  );
+  // A visible extension document is required to keep a microphone stream
+  // alive, but it must not hijack the user's browser tab. Keep it in a small
+  // purpose-built window that closes as soon as recording finishes.
+  const popup = await chrome.windows.create({
+    url,
+    type: "popup",
+    width: 430,
+    height: 330,
+    focused: true,
   });
+  // Chrome does not reliably populate tabs in the window-create response.
+  // Resolve it explicitly so Stop reaches the recorder and it can flush its
+  // final chunk before the report is archived.
+  const [captureTab] = await chrome.tabs.query({ windowId: popup.id });
+  firefoxVideoTabId = captureTab?.id ?? null;
+  if (!firefoxVideoTabId) {
+    throw new Error("Could not initialize the video capture window.");
+  }
 }
 
 async function stopVideoCapture(): Promise<void> {
@@ -1350,9 +1500,11 @@ async function sweepOrphanedOpfsFiles(): Promise<void> {
     const sess = bgSession;
     const standaloneScreenshots = await getStandaloneScreenshotFilenames();
     const standaloneDomSnapshots = await getStandaloneDomSnapshotFilenames();
+    const archivedFiles = (await getArchivedRecordings()).flatMap((recording) => recording.files);
     const activeFiles = new Set<string>([
       ...standaloneScreenshots,
       ...standaloneDomSnapshots,
+      ...archivedFiles,
       ...(sess?.screenshotFilenames ?? []),
       ...(sess?.videoOpfsFilename ? [sess.videoOpfsFilename] : []),
       ...(sess?.replayOpfsFilename ? [sess.replayOpfsFilename] : []),

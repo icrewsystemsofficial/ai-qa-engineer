@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a bug in the Browser Recorder extension
+description: Report a bug in the AI QA Engineer extension
 labels: ["bug"]
 body:
   - type: markdown

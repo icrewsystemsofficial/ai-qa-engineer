@@ -3,7 +3,7 @@ import type {
   DebuggerConsoleEvent,
   DebuggerNetworkEvent,
   DebuggerActionEvent,
-} from "@browser-recorder/core";
+} from "@ai-qa-engineer/core";
 
 export class BrowserCapture {
   readonly startedAt: number;

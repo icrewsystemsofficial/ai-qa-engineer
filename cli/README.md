@@ -1,4 +1,4 @@
-# @browser-recorder/cli
+# @ai-qa-engineer/cli
 
 Capture browser events from the command line and export a self-contained `.zip` report.
 
@@ -15,7 +15,7 @@ The package is not published to npm yet. From a clone of this repo:
 
 ```sh
 pnpm install
-pnpm --filter @browser-recorder/cli build
+pnpm --filter @ai-qa-engineer/cli build
 ```
 
 Then run it directly:
@@ -28,7 +28,7 @@ Or link it for use anywhere on your machine:
 
 ```sh
 cd cli && pnpm link --global
-browser-recorder --help
+ai-qa-engineer --help
 ```
 
 ## Quick start
@@ -40,7 +40,7 @@ browser-recorder --help
 google-chrome --remote-debugging-port=9222
 
 # 2. In another terminal, attach and start capturing.
-browser-recorder record --port 9222 --output ./report.zip
+ai-qa-engineer record --port 9222 --output ./report.zip
 
 # 3. Reproduce the bug. Press Ctrl+C when done.
 # 4. Answer the prompts (title, description, notes) — or pass --title/--description/--notes to skip.
@@ -58,14 +58,14 @@ export default async function (page) {
 };
 EOF
 
-browser-recorder run --script ./steps.js --output ./report.zip
+ai-qa-engineer run --script ./steps.js --output ./report.zip
 ```
 
 The script must have a **default export** that receives a `playwright.Page` and returns a `Promise`.
 
 ## Commands
 
-### `browser-recorder record`
+### `ai-qa-engineer record`
 
 Attach to a running Chromium-based browser via CDP and capture events.
 
@@ -83,10 +83,10 @@ Attach to a running Chromium-based browser via CDP and capture events.
 **Non-interactive mode:** pass `-t`, `-d`, and `-n` to skip the post-capture prompts (useful in CI):
 
 ```sh
-browser-recorder record --port 9222 --title "Login broken" --description "500 on POST /login" --notes "See steps" --output ./report.zip
+ai-qa-engineer record --port 9222 --title "Login broken" --description "500 on POST /login" --notes "See steps" --output ./report.zip
 ```
 
-### `browser-recorder run`
+### `ai-qa-engineer run`
 
 Launch a browser, run a Playwright script, and export events.
 
@@ -104,13 +104,13 @@ Launch a browser, run a Playwright script, and export events.
 **Example with a specific browser:**
 
 ```sh
-browser-recorder run --script ./steps.js --browser firefox --output ./firefox-report.zip
+ai-qa-engineer run --script ./steps.js --browser firefox --output ./firefox-report.zip
 ```
 
 **Example with a custom executable (Brave on macOS):**
 
 ```sh
-browser-recorder run --script ./steps.js \
+ai-qa-engineer run --script ./steps.js \
   --browser chromium \
   --executable "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" \
   --output ./report.zip

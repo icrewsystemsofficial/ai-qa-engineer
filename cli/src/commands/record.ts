@@ -43,7 +43,7 @@ export async function recordCommand(options: RecordOptions): Promise<void> {
     console.error(
       `'${browserName}' does not support CDP remote attach.\n` +
         `Use 'run' mode instead:\n` +
-        `  browser-recorder run --browser ${browserName} --script ./steps.js`,
+        `  ai-qa-engineer run --browser ${browserName} --script ./steps.js`,
     );
     process.exit(1);
   }

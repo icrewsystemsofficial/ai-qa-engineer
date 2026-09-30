@@ -10,7 +10,7 @@ import {
 import type { Diagnostics } from "./diagnostics";
 import { DEFAULT_CAPTURE_CONFIG, DEFAULT_NETWORK_FILTER } from "./types";
 
-const HOMEPAGE = "https://github.com/npalladium/chrome-recorder";
+const HOMEPAGE = "https://github.com/icrewsystemsofficial/ai-qa-engineer";
 
 function makeData(overrides: Partial<ReportData> = {}): ReportData {
   return {
@@ -79,15 +79,15 @@ describe("buildEnvironmentBlock", () => {
 describe("buildIssueUrl", () => {
   it("targets the bug template and prefills the environment field", () => {
     const url = buildIssueUrl(HOMEPAGE, "Extension version: 0.4.0");
-    expect(url).toContain("github.com/npalladium/chrome-recorder/issues/new");
+    expect(url).toContain("github.com/icrewsystemsofficial/ai-qa-engineer/issues/new");
     expect(url).toContain("template=bug_report.yml");
     expect(url).toContain(`environment=${encodeURIComponent("Extension version: 0.4.0")}`);
   });
 
   it("tolerates a trailing slash on the homepage URL", () => {
     const url = buildIssueUrl(`${HOMEPAGE}/`, "x");
-    expect(url).toContain("chrome-recorder/issues/new?");
-    expect(url).not.toContain("chrome-recorder//issues");
+    expect(url).toContain("ai-qa-engineer/issues/new?");
+    expect(url).not.toContain("ai-qa-engineer//issues");
   });
 
   it("truncates an oversized environment block to stay under the URL cap", () => {

@@ -48,5 +48,5 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
-            .output/browser-recorder-*-chrome.zip
-            .output/browser-recorder-*-firefox.zip
+            .output/ai-qa-engineer-*-chrome.zip
+            .output/ai-qa-engineer-*-firefox.zip

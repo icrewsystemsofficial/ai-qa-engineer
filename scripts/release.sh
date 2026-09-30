@@ -56,10 +56,6 @@ for f in "$CHROME_ZIP" "$FIREFOX_ZIP"; do
   fi
 done
 
-# ── GitHub auth ───────────────────────────────────────────────────────────────
-
-gh auth switch --user npalladium
-
 # ── Release ───────────────────────────────────────────────────────────────────
 
 if gh release view "$TAG" --json tagName -q .tagName &>/dev/null; then
@@ -84,5 +80,4 @@ else
     "$FIREFOX_ZIP"
 fi
 
-echo "✓ done — https://github.com/npalladium/chrome-recorder/releases/tag/${TAG}"
-
+echo "✓ done — https://github.com/icrewsystemsofficial/ai-qa-engineer/releases/tag/${TAG}"

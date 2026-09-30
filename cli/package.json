@@ -1,9 +1,9 @@
 {
-  "name": "@browser-recorder/cli",
+  "name": "@ai-qa-engineer/cli",
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "browser-recorder": "./dist/index.js"
+    "ai-qa-engineer": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -16,7 +16,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@browser-recorder/core": "workspace:*",
+    "@ai-qa-engineer/core": "workspace:*",
     "@inquirer/prompts": "^8.5.2",
     "commander": "^15.0.0",
     "fflate": "^0.8.3",

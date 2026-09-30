@@ -1,12 +1,12 @@
 import { Zip, ZipPassThrough } from "fflate";
 import { createWriteStream } from "node:fs";
-import { buildReportMd } from "@browser-recorder/core";
+import { buildReportMd } from "@ai-qa-engineer/core";
 import type {
   ReportInput,
   DebuggerConsoleEvent,
   DebuggerNetworkEvent,
   DebuggerActionEvent,
-} from "@browser-recorder/core";
+} from "@ai-qa-engineer/core";
 
 export interface CliExportInput {
   title: string;
@@ -42,7 +42,7 @@ export async function exportZip(input: CliExportInput, outputPath: string): Prom
     sessionDurationMs: now.getTime() - input.startedAt,
   };
 
-  const README = `# Bug report — browser-recorder CLI\n\nCaptured with browser-recorder CLI.\n\n| File | Contents |\n|---|---|\n| report.md | Human/agent-readable summary |\n| metadata.json | Session info |\n| console.json | Console events |\n| network.json | Network requests |\n| interactions.json | User interactions |\n| dom-snapshot-*.html | DOM snapshots |\n| screenshot-*.png | Screenshots |\n`;
+  const README = `# Bug report — AI QA Engineer CLI\n\nCaptured with AI QA Engineer CLI.\n\n| File | Contents |\n|---|---|\n| report.md | Human/agent-readable summary |\n| metadata.json | Session info |\n| console.json | Console events |\n| network.json | Network requests |\n| interactions.json | User interactions |\n| dom-snapshot-*.html | DOM snapshots |\n| screenshot-*.png | Screenshots |\n`;
 
   return new Promise((resolve, reject) => {
     const out = createWriteStream(outputPath);

@@ -34,7 +34,9 @@ function buildStreamConstraints(streamId: string, config: VideoConfig): MediaStr
   }
   // "native" — no width/height cap; only frameRate is constrained
   return {
-    audio: false,
+    // Capture tab audio; it is mixed with optional microphone narration below.
+    // @ts-expect-error chromeMediaSource/mandatory not in standard DOM types
+    audio: { mandatory },
     // @ts-expect-error chromeMediaSource/mandatory not in standard DOM types
     video: { mandatory },
   };
@@ -48,6 +50,8 @@ type WorkerReply =
 
 let recorder: MediaRecorder | null = null;
 let opfsWorker: Worker | null = null;
+let microphoneStream: MediaStream | null = null;
+let audioContext: AudioContext | null = null;
 let totalBytes = 0;
 let warnedAt100MB = false;
 
@@ -94,6 +98,29 @@ async function startRecording(
     buildStreamConstraints(streamId, videoConfig)
   );
 
+  const mixed = new MediaStream(stream.getVideoTracks());
+  if (stream.getAudioTracks().length > 0 || videoConfig.microphone) {
+    audioContext = new AudioContext();
+    const destination = audioContext.createMediaStreamDestination();
+    if (stream.getAudioTracks().length > 0) {
+      const tabAudio = audioContext.createMediaStreamSource(stream);
+      tabAudio.connect(destination);
+      // tabCapture otherwise suppresses local playback while it is recorded.
+      tabAudio.connect(audioContext.destination);
+    }
+    if (videoConfig.microphone) {
+      try {
+        microphoneStream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true },
+        });
+        audioContext.createMediaStreamSource(microphoneStream).connect(destination);
+      } catch {
+        // Tab audio remains available if microphone permission was declined.
+      }
+    }
+    for (const track of destination.stream.getAudioTracks()) mixed.addTrack(track);
+  }
+
   opfsWorker = new Worker(chrome.runtime.getURL("opfs-worker.js"));
   opfsWorker.postMessage({ type: "init", filename });
 
@@ -131,7 +158,7 @@ async function startRecording(
 
   const mimeType = resolveMimeType(videoConfig.format);
 
-  recorder = new MediaRecorder(stream, {
+  recorder = new MediaRecorder(mixed, {
     ...(mimeType ? { mimeType } : {}),
     videoBitsPerSecond: videoConfig.bitrate * 1000,
   });
@@ -145,6 +172,10 @@ async function startRecording(
 
   recorder.onstop = () => {
     for (const t of stream.getTracks()) t.stop();
+    for (const t of microphoneStream?.getTracks() ?? []) t.stop();
+    microphoneStream = null;
+    void audioContext?.close();
+    audioContext = null;
     opfsWorker?.postMessage({ type: "finalize" });
   };
 

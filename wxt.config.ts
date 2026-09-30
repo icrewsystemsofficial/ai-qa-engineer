@@ -62,22 +62,23 @@ export default defineConfig({
   }),
   manifest: ({ browser }) => {
     const isFirefox = browser === "firefox";
-    // The `key` pins a stable extension ID for local unpacked loads. The Chrome
-    // Web Store assigns its own key/ID, and a mismatching `key` makes store
-    // uploads fail — so strip it for store builds (CWS_BUILD=1).
-    const isStoreBuild = process.env.CWS_BUILD === "1";
     return {
-      name: "Browser Recorder",
-      short_name: "Recorder",
+      name: "AI QA Engineer",
+      short_name: "AI QA",
       description: "Capture console, network, interactions and DOM snapshots for bug reports",
       ...(pkg.homepage && { homepage_url: pkg.homepage }),
       action: {
-        default_title: "Browser Recorder",
+        default_title: "AI QA Engineer",
         default_popup: "popup.html",
       },
       options_ui: {
         page: "options.html",
         open_in_tab: true,
+      },
+      icons: {
+        16: "icon/favicon-16x16.png",
+        32: "icon/favicon-32x32.png",
+        128: "icon/android-chrome-192x192.png",
       },
       commands: {
         "start-session": {
@@ -106,14 +107,10 @@ export default defineConfig({
         ...(!isFirefox ? (["tabCapture", "offscreen"] as const) : []),
       ],
       host_permissions: ["<all_urls>"],
-      ...(!isFirefox &&
-        !isStoreBuild && {
-          key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqMJOHRmc9Xix5QczXMbZjdFGsglwBDQvWxXMvlvJ3gvXJxDqwBGp8CXAgu3mAwjtcEAFD0+gCRlOCswKXC4PEUZsLWbUK+x+85sDtWZjH3Z0Nd4FV20F1qxx5ZWi/sUaexoJMaUmbmZ+G32n97NlhIyTag3KdgyKhQmX8DBNSMEK5mW1SuoFGouiMjwdnWESQYGLcZMn/yg9EF5A8/QqOQn6sYXSTHxdkXkJKrTMt+HgVqn1xuAMrHhMFQ51v2YyxO5PysLqFGP+HUOD1xyN1sBU41+tHNnJNFzvdjeZ73cUstdiDtGah8D6jpeVtTH1LTqGfpLeN/1thkNkgytmBQIDAQAB",
-        }),
       ...(isFirefox && {
         browser_specific_settings: {
           gecko: {
-            id: "browser-recorder@npalladium.dev",
+            id: "ai-qa-engineer@icrewsystems.com",
             strict_min_version: "128.0",
             data_collection_permissions: {
               required: ["none"],

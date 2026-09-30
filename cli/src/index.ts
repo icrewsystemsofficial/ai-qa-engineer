@@ -6,7 +6,7 @@ import { runCommand } from "./commands/run.js";
 const program = new Command();
 
 program
-  .name("browser-recorder")
+  .name("ai-qa-engineer")
   .description("Capture browser events and export a zip report")
   .version("0.1.0");
 

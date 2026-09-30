@@ -259,7 +259,14 @@ function IdleView({ initialConfig }: { initialConfig: CaptureConfig }) {
   const [error, setError] = useState<string | null>(null);
   const dismiss = useDismiss();
 
-  const toggle = (key: keyof CaptureConfig) => setConfig((c) => ({ ...c, [key]: !c[key] }));
+  const toggle = (key: keyof CaptureConfig) => {
+    const nextConfig = { ...config, [key]: !config[key] };
+    setConfig(nextConfig);
+    setError(null);
+    void sendToBackground({ type: "save-capture-config", captureConfig: nextConfig }).catch((e) => {
+      setError(e instanceof Error ? e.message : String(e));
+    });
+  };
 
   const startSession = async () => {
     setStarting(true);
@@ -295,102 +302,44 @@ function IdleView({ initialConfig }: { initialConfig: CaptureConfig }) {
     <div className="flex flex-col gap-3 p-4">
       <Button className="w-full" onClick={startSession} disabled={starting}>
         <Circle className="h-3 w-3 fill-current" />
-        {starting ? "Starting…" : "Start session"}
+        {starting ? "Starting…" : "Record"}
       </Button>
       <p className="text-center text-[10px] text-muted-foreground/60 -mt-2">⌥⇧R</p>
 
-      <Separator />
-
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        For this session
-      </p>
-
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm">
-            <Code className="h-4 w-4 text-muted-foreground" />
-            Console
-          </div>
-          <Switch id="console" checked={config.console} onChange={() => toggle("console")} />
-        </div>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm">
-            <Network className="h-4 w-4 text-muted-foreground" />
-            Network
-          </div>
-          <Switch id="network" checked={config.network} onChange={() => toggle("network")} />
-        </div>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm">
-            <MousePointer className="h-4 w-4 text-muted-foreground" />
-            Interactions
-          </div>
-          <Switch
-            id="interactions"
-            checked={config.interactions}
-            onChange={() => toggle("interactions")}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm">
-            <FileCode className="h-4 w-4 text-muted-foreground" />
-            DOM snapshots
-          </div>
-          <Switch
-            id="domSnapshots"
-            checked={config.domSnapshots}
-            onChange={() => toggle("domSnapshots")}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm">
-            <Video className="h-4 w-4 text-muted-foreground" />
-            Video recording
-          </div>
-          <Switch id="video" checked={config.video} onChange={() => toggle("video")} />
-        </div>
-        {import.meta.env.BROWSER === "firefox" && config.video && (
-          <p className="text-xs text-muted-foreground pl-6">
-            A capture tab will open — select this tab in the picker.
-          </p>
-        )}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm">
-            <History className="h-4 w-4 text-muted-foreground" />
-            Session replay
-            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
-              experimental
-            </span>
-          </div>
-          <Switch id="replay" checked={config.replay} onChange={() => toggle("replay")} />
-        </div>
-      </div>
-
-      <Separator />
-
-      <div className="flex flex-col gap-1">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1">
         <Button variant="outline" className="w-full" onClick={takeScreenshot}>
           <Camera className="h-4 w-4" />
           Screenshot
         </Button>
-        <p className="text-center text-[10px] text-muted-foreground/60">
-          No debug data — annotation only · ⌥⇧C
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-1">
+        </div>
+        <div className="flex flex-col gap-1">
         <Button variant="outline" className="w-full" onClick={snapshotDom}>
           <FileCode className="h-4 w-4" />
           Snapshot DOM
         </Button>
-        <p className="text-center text-[10px] text-muted-foreground/60">
-          Capture page HTML — no session · ⌥⇧D
-        </p>
+        </div>
       </div>
+      <p className="text-center text-[10px] text-muted-foreground/60 -mt-1">
+        ⌥⇧C Screenshot · ⌥⇧D DOM snapshot
+      </p>
+
+      <details className="rounded-md border border-border bg-muted/20">
+        <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-muted-foreground">
+          Recording defaults &amp; options
+        </summary>
+        <div className="flex flex-col gap-2 border-t border-border px-3 py-3">
+          <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm"><Code className="h-4 w-4 text-muted-foreground" />Console</span><Switch id="console" checked={config.console} onChange={() => toggle("console")} /></div>
+          <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm"><Network className="h-4 w-4 text-muted-foreground" />Network</span><Switch id="network" checked={config.network} onChange={() => toggle("network")} /></div>
+          <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm"><MousePointer className="h-4 w-4 text-muted-foreground" />Interactions</span><Switch id="interactions" checked={config.interactions} onChange={() => toggle("interactions")} /></div>
+          <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm"><FileCode className="h-4 w-4 text-muted-foreground" />DOM snapshots</span><Switch id="domSnapshots" checked={config.domSnapshots} onChange={() => toggle("domSnapshots")} /></div>
+          <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm"><Video className="h-4 w-4 text-muted-foreground" />Video recording</span><Switch id="video" checked={config.video} onChange={() => toggle("video")} /></div>
+          <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm"><History className="h-4 w-4 text-muted-foreground" />Session replay</span><Switch id="replay" checked={config.replay} onChange={() => toggle("replay")} /></div>
+          <RingSection />
+        </div>
+      </details>
 
       {error && <p className="text-xs text-destructive">{error}</p>}
-
-      <RingSection />
     </div>
   );
 }
@@ -465,9 +414,16 @@ function ActiveView({ currentTabId }: { currentTabId: number | null }) {
 
   if (isStarting) {
     return (
-      <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Connecting…
+      <div className="flex flex-col gap-3 p-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          {session.captureConfig.video ? "Waiting for video selection…" : "Connecting…"}
+        </div>
+        {session.captureConfig.video && (
+          <Button variant="outline" size="sm" onClick={confirmDiscard}>
+            Cancel recording
+          </Button>
+        )}
       </div>
     );
   }
@@ -648,7 +604,7 @@ export default function App() {
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <div className="flex items-center gap-2">
           <Logo className="h-5 w-5" />
-          <span className="text-sm font-semibold tracking-tight">Browser Recorder</span>
+          <span className="text-sm font-semibold tracking-tight">AI QA Engineer</span>
         </div>
         <div className="flex items-center gap-2">
           {showOpenInPanel && (
@@ -662,6 +618,15 @@ export default function App() {
               <PanelRight className="h-4 w-4" />
             </button>
           )}
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => chrome.tabs.create({ url: chrome.runtime.getURL("/workspaces.html") })}
+            aria-label="Open recording library"
+            title="Recording library"
+          >
+            <History className="h-4 w-4" />
+          </button>
           <button
             type="button"
             className="text-muted-foreground hover:text-foreground transition-colors"

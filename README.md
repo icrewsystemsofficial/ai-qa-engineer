@@ -1,4 +1,4 @@
-# Browser Recorder
+# AI QA Engineer
 
 A browser extension (Chrome + Firefox) that captures everything you need to file a bug report — console, network, interactions, DOM, screenshots, and optional video — and bundles it into a self-contained `.zip` you can hand to a teammate or paste into an issue.
 
@@ -10,7 +10,7 @@ No server, no account, no cloud.
 
 ## What you get
 
-A single `.zip` per capture, named `browser-recording-{title}-{date}.zip`, containing a self-contained `report.html` viewer you can open in any browser. It includes:
+A single `.zip` per capture, named `ai-qa-engineer-{title}-{date}.zip`, containing a self-contained `report.html` viewer you can open in any browser. It includes:
 
 - **Console** — `log`/`warn`/`error`/`info`/`debug` from page JS, plus uncaught errors
 - **Network** — every XHR/fetch request and response (headers + body), each copyable as a `curl` scaffold
@@ -66,6 +66,8 @@ Pre-1.0 — feature set and APIs are still settling. See [TODOS.md](TODOS.md) fo
 [AGPL-3.0](LICENSE).
 
 This project includes code adapted from [crikket](https://github.com/redpangilinan/crikket) by [redpangilinan](https://github.com/redpangilinan), also AGPL-3.0. That license applies to the whole project as a result.
+
+AI QA Engineer is a fork of Browser Recorder, originally created by Nikhil Pallamreddy. The original authorship, commit history, and AGPL-3.0 license are retained.
 
 ## Third-party
 

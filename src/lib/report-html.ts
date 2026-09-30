@@ -4,7 +4,7 @@
 // other artifacts (screenshots, DOM snapshots, video, replay) by relative path
 // — so it works as soon as the ZIP is unzipped. The event data is inlined as
 // JSON; images/video/dom are referenced rather than embedded to keep it light.
-import type { PerformanceSummary, TimelineEntry } from "@browser-recorder/core";
+import type { PerformanceSummary, TimelineEntry } from "@ai-qa-engineer/core";
 
 export interface ReportHtmlInput {
   title: string;
