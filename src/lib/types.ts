@@ -11,6 +11,8 @@ export interface CaptureConfig {
   interactions: boolean;
   domSnapshots: boolean;
   video: boolean;
+  /** Perform one lightweight #app-build lookup before a session starts. */
+  searchDomForBuildInfo: boolean;
   fullSelectorPath: boolean;
   autoScreenshotOnInteraction: boolean;
   autoDomSnapshotOnInteraction: boolean;
@@ -64,6 +66,7 @@ export const DEFAULT_CAPTURE_CONFIG: CaptureConfig = {
   interactions: true,
   domSnapshots: true,
   video: false,
+  searchDomForBuildInfo: true,
   fullSelectorPath: true,
   autoScreenshotOnInteraction: false,
   autoDomSnapshotOnInteraction: false,
@@ -124,6 +127,10 @@ export interface Session {
   domSnapshotCount: number;
   domSnapshotKeys: string[];
   screenshotFilenames: string[];
+  /** Click ordinals with an automatically captured documentation frame. */
+  autoScreenshotClickNumbers?: number[];
+  /** Precise link between a click ordinal and its OPFS screenshot filename. */
+  autoScreenshotClickFrames?: Array<{ clickNumber: number; filename: string }>;
   videoOpfsFilename: string | null;
   // OPFS filename for the rrweb replay events JSON (experimental). Null until
   // the session is stopped with replay capture enabled.

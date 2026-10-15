@@ -1,4 +1,5 @@
 import { Logo } from "@/components/logo";
+import { Accordion, AccordionItem } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -324,11 +325,9 @@ function IdleView({ initialConfig }: { initialConfig: CaptureConfig }) {
         ⌥⇧C Screenshot · ⌥⇧D DOM snapshot
       </p>
 
-      <details className="rounded-md border border-border bg-muted/20">
-        <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-muted-foreground">
-          Recording defaults &amp; options
-        </summary>
-        <div className="flex flex-col gap-2 border-t border-border px-3 py-3">
+      <Accordion>
+        <AccordionItem title="Recording options" description="Choose what this session captures">
+        <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm"><Code className="h-4 w-4 text-muted-foreground" />Console</span><Switch id="console" checked={config.console} onChange={() => toggle("console")} /></div>
           <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm"><Network className="h-4 w-4 text-muted-foreground" />Network</span><Switch id="network" checked={config.network} onChange={() => toggle("network")} /></div>
           <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm"><MousePointer className="h-4 w-4 text-muted-foreground" />Interactions</span><Switch id="interactions" checked={config.interactions} onChange={() => toggle("interactions")} /></div>
@@ -337,7 +336,8 @@ function IdleView({ initialConfig }: { initialConfig: CaptureConfig }) {
           <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm"><History className="h-4 w-4 text-muted-foreground" />Session replay</span><Switch id="replay" checked={config.replay} onChange={() => toggle("replay")} /></div>
           <RingSection />
         </div>
-      </details>
+        </AccordionItem>
+      </Accordion>
 
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>

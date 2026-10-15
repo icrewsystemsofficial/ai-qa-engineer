@@ -11,6 +11,7 @@ interface ActionCaptureInput {
 
 export function installActionAndNavigationCapture(input: ActionCaptureInput): void {
   const { postAction, fullSelectorPath = true } = input;
+  let clickNumber = 0;
 
   const postNavigationBreadcrumb = (mode: string) => {
     postAction("navigation", "window", {
@@ -43,10 +44,25 @@ export function installActionAndNavigationCapture(input: ActionCaptureInput): vo
 
   const delegatedHandlers: Record<"click" | "input" | "change", (event: Event) => void> = {
     click: (event) => {
+      const meta = getElementMeta(event.target);
+      if (event instanceof MouseEvent) {
+        meta.clickNumber = ++clickNumber;
+        meta.clientX = Math.round(event.clientX);
+        meta.clientY = Math.round(event.clientY);
+      }
+      if (event.target instanceof Element) {
+        const rect = event.target.getBoundingClientRect();
+        meta.targetRect = {
+          x: Math.round(rect.left),
+          y: Math.round(rect.top),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        };
+      }
       postAction(
         "click",
         getElementTarget(event.target, fullSelectorPath),
-        getElementMeta(event.target)
+        meta
       );
     },
     input: (event) => {

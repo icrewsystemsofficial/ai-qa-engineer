@@ -104,7 +104,7 @@ export default defineConfig({
         "scripting",
         "storage",
         "tabs",
-        ...(!isFirefox ? (["tabCapture", "offscreen"] as const) : []),
+        ...(!isFirefox ? (["tabCapture", "desktopCapture", "offscreen"] as const) : []),
       ],
       host_permissions: ["<all_urls>"],
       ...(isFirefox && {

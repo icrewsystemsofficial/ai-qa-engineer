@@ -81,7 +81,6 @@ import {
 const INTERACTION_CAPTURE_DEBOUNCE_MS = 1500;
 // Let the click's UI update paint before its screenshot is captured. Each
 // click is queued independently: screenshots must never be coalesced.
-const AUTO_SCREENSHOT_SETTLE_MS = 300;
 const COUNT_PERSIST_DEBOUNCE_MS = 500;
 // Popup needs ~300 ms to close before tab screenshot is taken
 const SCREENSHOT_POPUP_DISMISS_MS = 300;
@@ -106,6 +105,9 @@ let firefoxVideoTabId: number | null = null;
 // await finalization before opening the report recorder.
 let firefoxVideoDoneResolve: (() => void) | null = null;
 let firefoxVideoDonePromise: Promise<void> = Promise.resolve();
+// Ring-buffer video also uses the offscreen document. This tracks only an
+// explicit session waiting for its recorder to acquire the chosen stream.
+let offscreenSessionAwaitingReady = false;
 
 function emptyCounts(): SessionCounts {
   return {
@@ -379,15 +381,11 @@ function clearAutoCaptureTimers() {
   }
 }
 
-function queueAutoScreenshot(tabId: number): void {
+function queueAutoScreenshot(tabId: number, marker?: Record<string, unknown>): void {
+  // Preserve ordering when several clicks arrive together, but do not wait for
+  // the UI to settle: documentation evidence should show the click moment.
   autoScreenshotChain = autoScreenshotChain
-    .then(
-      () =>
-        new Promise<void>((resolve) => {
-          setTimeout(resolve, AUTO_SCREENSHOT_SETTLE_MS);
-        })
-    )
-    .then(() => captureAutoScreenshot(tabId))
+    .then(() => captureAutoScreenshot(tabId, marker))
     .catch((err) => reportNonFatalError("Auto-screenshot queue failed", err));
 }
 
@@ -526,6 +524,11 @@ async function activatePendingSession(): Promise<void> {
   if (!bgSession || bgSession.status !== "starting") return;
   const session = bgSession;
   const { networkFilter } = await getSettings();
+  // This is intentionally a single, pre-recording lookup. It neither watches
+  // the page nor adds a persistent content script to the application.
+  if (session.captureConfig.searchDomForBuildInfo) {
+    session.appBuild = await captureAppBuildInfo(session.tabId);
+  }
   try {
     const { sessionId: dbgId } = await debuggerBridge.startSession(session.tabId, {
       ...session.captureConfig,
@@ -541,7 +544,6 @@ async function activatePendingSession(): Promise<void> {
   }
 
   session.status = "recording";
-  session.appBuild = await captureAppBuildInfo(session.tabId);
   await persistSession();
   if (session.captureConfig.domSnapshots) {
     await captureAndStoreDomSnapshot(session.tabId, "start");
@@ -641,7 +643,7 @@ export default defineBackground(() => {
         let websocketN = 0;
         let sseN = 0;
         let hasAutoDomTriggerAction = false;
-        let autoScreenshotClicks = 0;
+        const autoScreenshotClicks: Record<string, unknown>[] = [];
         for (const e of events) {
           if (e.kind === "console") consoleN++;
           else if (e.kind === "network") networkN++;
@@ -649,7 +651,7 @@ export default defineBackground(() => {
           else if (e.kind === "sse") sseN++;
           else if (e.kind === "action") {
             interactionsN++;
-            if (e.actionType === "click") autoScreenshotClicks++;
+            if (e.actionType === "click") autoScreenshotClicks.push(e.metadata ?? {});
             if (
               e.actionType === "click" ||
               e.actionType === "change" ||
@@ -670,8 +672,8 @@ export default defineBackground(() => {
         }
 
         if (bgSession.captureConfig.autoScreenshotOnInteraction) {
-          for (let index = 0; index < autoScreenshotClicks; index++) {
-            queueAutoScreenshot(tabId);
+          for (const marker of autoScreenshotClicks) {
+            queueAutoScreenshot(tabId, marker);
           }
         }
 
@@ -925,6 +927,8 @@ async function handleMessage(message: BgMessage) {
         domSnapshotCount: 0,
         domSnapshotKeys: [],
         screenshotFilenames: [],
+        autoScreenshotClickNumbers: [],
+        autoScreenshotClickFrames: [],
         videoOpfsFilename: null,
         replayOpfsFilename: null,
         eventsOpfsFilename: null,
@@ -945,15 +949,23 @@ async function handleMessage(message: BgMessage) {
       if (cc.video) expectStage("video", "start");
 
       if (message.captureConfig.video) {
-        const { videoConfig } = await getSettings();
-        if ("tabCapture" in chrome && videoConfig.source === "tab") {
-          await startVideoCapture(tab.id, bgSession);
-        } else {
-          await startFirefoxVideoCapture(bgSession);
+        try {
+          const { videoConfig } = await getSettings();
+          if ("tabCapture" in chrome && videoConfig.source === "tab") {
+            await startVideoCapture(tab.id, bgSession);
+          } else if ("desktopCapture" in chrome && "offscreen" in chrome) {
+            await startDesktopVideoCapture(bgSession, videoConfig);
+          } else {
+            await startFirefoxVideoCapture(bgSession);
+          }
+        } catch (err) {
+          // Never leave a cancelled or failed picker as a zombie “starting”
+          // session in the popup.
+          await handleMessage({ type: "discard-session" });
+          throw err;
         }
-        // The visible capture window reports fx-video-ready only after Chrome
-        // has granted/share-selected the video stream. Until then this is
-        // deliberately not a recording session.
+        // The hidden recorder reports readiness only after Chrome has granted
+        // the selected source. Until then this is deliberately not recording.
         return ok(bgSession);
       }
 
@@ -1348,11 +1360,21 @@ function serializeDom(): string {
   return `<!doctype html>\n${clone.outerHTML}`;
 }
 
-async function captureAutoScreenshot(tabId: number): Promise<void> {
+async function captureAutoScreenshot(
+  tabId: number,
+  marker?: Record<string, unknown>
+): Promise<void> {
   if (!bgSession || bgSession.tabId !== tabId || bgSession.status !== "recording") return;
   try {
     const tab = await chrome.tabs.get(tabId);
     if (!tab.windowId) return;
+    if (marker) {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        func: showDocumentationClickMarker,
+        args: [marker],
+      }).catch(() => {});
+    }
     const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" });
     const index = bgSession.screenshotFilenames.length + 1;
     const filename = screenshotOpfsFilename(bgSession.id, index);
@@ -1362,11 +1384,61 @@ async function captureAutoScreenshot(tabId: number): Promise<void> {
       Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
     );
     bgSession.screenshotFilenames.push(filename);
+    const clickNumber = Number(marker?.clickNumber);
+    if (Number.isFinite(clickNumber) && clickNumber > 0) {
+      bgSession.autoScreenshotClickNumbers = [
+        ...(bgSession.autoScreenshotClickNumbers ?? []),
+        clickNumber,
+      ];
+      bgSession.autoScreenshotClickFrames = [
+        ...(bgSession.autoScreenshotClickFrames ?? []),
+        { clickNumber, filename },
+      ];
+    }
     void persistSession();
     bumpCount("screenshots");
   } catch (err) {
     reportNonFatalError("Auto-screenshot failed", err);
   }
+}
+
+// Runs in the recorded page immediately before its click screenshot. It is
+// deliberately ephemeral and pointer-transparent so documentation captures
+// show both the chosen control and an unambiguous numbered click marker.
+function showDocumentationClickMarker(marker: Record<string, unknown>): void {
+  document.querySelector("#ai-qa-click-marker")?.remove();
+  const rect = marker.targetRect as
+    | { x?: number; y?: number; width?: number; height?: number }
+    | undefined;
+  const x = Number(rect?.x ?? marker.clientX ?? 0);
+  const y = Number(rect?.y ?? marker.clientY ?? 0);
+  const width = Math.max(28, Number(rect?.width ?? 0));
+  const height = Math.max(28, Number(rect?.height ?? 0));
+  const number = String(marker.clickNumber ?? "•");
+  const overlay = document.createElement("div");
+  overlay.id = "ai-qa-click-marker";
+  overlay.setAttribute("aria-hidden", "true");
+  overlay.style.cssText = [
+    "position:fixed",
+    "z-index:2147483647",
+    "pointer-events:none",
+    "border:3px solid #ff4d6d",
+    "border-radius:6px",
+    "box-shadow:0 0 0 3px rgba(255,77,109,.25)",
+    "left:" + x + "px",
+    "top:" + y + "px",
+    "width:" + width + "px",
+    "height:" + height + "px",
+  ].join(";");
+  const badge = document.createElement("span");
+  badge.textContent = number;
+  badge.style.cssText =
+    "position:absolute;left:-12px;top:-14px;min-width:26px;height:26px;padding:0 7px;" +
+    "border-radius:999px;background:#ff4d6d;color:#fff;font:700 13px/26px system-ui;" +
+    "text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.3);";
+  overlay.append(badge);
+  document.documentElement.append(overlay);
+  window.setTimeout(() => overlay.remove(), 900);
 }
 
 async function captureAutoDomSnapshot(tabId: number): Promise<void> {
@@ -1392,7 +1464,7 @@ async function startFirefoxVideoCapture(session: Session): Promise<void> {
 }
 
 async function startVideoCapture(tabId: number, session: Session): Promise<void> {
-  if (!("tabCapture" in chrome)) return;
+  if (!("tabCapture" in chrome) || !("offscreen" in chrome)) return;
 
   const { videoConfig } = await getSettings();
   const ext = videoConfig.format === "h264" ? ".mp4" : ".webm";
@@ -1415,7 +1487,66 @@ async function startVideoCapture(tabId: number, session: Session): Promise<void>
     return;
   }
 
-  await openVisibleVideoCapture(session, filename, videoConfig, streamId);
+  await startOffscreenVideoCapture(streamId, filename, videoConfig, "tab", true);
+}
+
+/** Opens Chrome's protected source picker directly from Record, without an
+ * intermediate extension window. The resulting stream is consumed offscreen. */
+async function startDesktopVideoCapture(
+  session: Session,
+  videoConfig: Awaited<ReturnType<typeof getSettings>>["videoConfig"]
+): Promise<void> {
+  const filename = `${OPFS_PREFIX}display-recording-${session.id}.webm`;
+  session.videoOpfsFilename = filename;
+  await persistSession();
+
+  const sources: Array<"screen" | "window" | "tab" | "audio"> =
+    videoConfig.source === "desktop"
+      ? ["screen", "audio"]
+      : ["screen", "window", "tab", "audio"];
+  const selection = await new Promise<{ streamId: string; canRequestAudio: boolean }>(
+    (resolve) => {
+      chrome.desktopCapture.chooseDesktopMedia(sources, (streamId, options) => {
+        resolve({ streamId, canRequestAudio: options.canRequestAudioTrack });
+      });
+    }
+  );
+  if (!selection.streamId) throw new Error("Screen selection was cancelled.");
+  await startOffscreenVideoCapture(
+    selection.streamId,
+    filename,
+    videoConfig,
+    "desktop",
+    selection.canRequestAudio
+  );
+}
+
+async function startOffscreenVideoCapture(
+  streamId: string,
+  filename: string,
+  videoConfig: Awaited<ReturnType<typeof getSettings>>["videoConfig"],
+  source: "tab" | "desktop",
+  canRequestAudio: boolean
+): Promise<void> {
+  try {
+    await chrome.offscreen.createDocument({
+      url: chrome.runtime.getURL("offscreen.html"),
+      reasons: [(source === "desktop" ? "DISPLAY_MEDIA" : "USER_MEDIA") as chrome.offscreen.Reason],
+      justification: "Record a selected browser surface without opening an extension window",
+    });
+  } catch (err) {
+    // A just-stopped ring recorder may still own the single offscreen document.
+    if (!String(err).includes("Only a single offscreen document")) throw err;
+  }
+  offscreenSessionAwaitingReady = true;
+  await chrome.runtime.sendMessage({
+    type: "offscreen-start-recording",
+    streamId,
+    filename,
+    videoConfig,
+    source,
+    canRequestAudio,
+  });
 }
 
 async function openVisibleVideoCapture(
@@ -1470,7 +1601,12 @@ async function closeOffscreenIfOpen(): Promise<void> {
 }
 
 async function handleOffscreenMessage(msg: OffscreenMsg): Promise<void> {
-  if (msg.type === "offscreen-recording-done") {
+  if (msg.type === "offscreen-ready") {
+    if (offscreenSessionAwaitingReady && bgSession?.status === "starting") {
+      offscreenSessionAwaitingReady = false;
+      await activatePendingSession();
+    }
+  } else if (msg.type === "offscreen-recording-done") {
     bumpStage("video", "write", msg.totalBytes);
     await closeOffscreenIfOpen();
   } else if (msg.type === "offscreen-size-warning" && msg.megabytes >= 500) {
@@ -1478,6 +1614,10 @@ async function handleOffscreenMessage(msg: OffscreenMsg): Promise<void> {
   } else if (msg.type === "offscreen-error") {
     failStage("video", "write", msg.message);
     reportNonFatalError("Video recording error", new Error(msg.message));
+    if (offscreenSessionAwaitingReady && bgSession?.status === "starting") {
+      offscreenSessionAwaitingReady = false;
+      await handleMessage({ type: "discard-session" });
+    }
     await closeOffscreenIfOpen();
   } else if (msg.type === "offscreen-ring-chunk") {
     pruneRingBuffer();

@@ -675,10 +675,16 @@
 .recorder-brand-caption, .recorder-session-meta, .recorder-helper, .recorder-eyebrow, .recorder-playback-caption, .recorder-workspace-link, .recorder-text-button { color: #94a8c2; }
 .recorder-workspace-link:hover, .recorder-text-button:hover { color: #80aeff; }
 .recorder-saved { color: #77a7ff; }
-.recorder-playback { max-width: 900px; margin: 0 auto; }
-.recorder-video { aspect-ratio: 16 / 9; max-height: 420px; background: #020814; }
+.recorder-playback { max-width: 900px; margin: 0 auto; border-radius: 16px; box-shadow: 0 20px 52px rgba(0, 0, 0, .32); }
+.recorder-playback > .recorder-section-heading { min-height: 58px; padding: 0 18px; }
+.recorder-video-stage { position: relative; padding: 8px; background: linear-gradient(135deg, #172d4b 0%, #07101d 44%, #152a46 100%); }
+.recorder-video { aspect-ratio: 16 / 9; max-height: 420px; border: 1px solid #294564; border-radius: 10px; background: #020814; box-shadow: 0 10px 28px rgba(0, 0, 0, .38); }
+.recorder-video-status { position: absolute; z-index: 1; top: 19px; left: 19px; right: 19px; display: flex; align-items: center; justify-content: space-between; pointer-events: none; color: #e9f1ff; font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; text-shadow: 0 1px 3px rgba(0, 0, 0, .75); }
+.recorder-video-status span { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid rgba(179, 205, 244, .25); border-radius: 999px; background: rgba(4, 12, 23, .65); backdrop-filter: blur(8px); }
+.recorder-video-status i { width: 7px; height: 7px; border-radius: 50%; background: #ff5f68; box-shadow: 0 0 0 3px rgba(255, 95, 104, .18); }
 .recorder-video-empty { aspect-ratio: 16 / 9; background: #020814; color: #8ca2be; }
 .recorder-video-empty h3 { color: #e6edf7; }
+.recorder-playback-caption { min-height: 38px; padding: 11px 18px; border-top: 1px solid #1d314b; }
 .recorder-playback-caption > span:first-child { color: #c5d5eb; }
 .recorder-layout { grid-template-columns: minmax(0, 1fr) 470px; gap: 34px; }
 .recorder-sidebar { display: flex; flex-direction: column; gap: 14px; }
@@ -694,6 +700,8 @@
 .recorder-build-values span { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #2a405e; border-radius: 999px; padding: 3px 7px; color: #b8cce7; font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .recorder-build-unavailable { margin: 10px 0 0; color: #d7b76d; font-size: 10px; line-height: 1.5; }
 .recorder-build-unavailable code { color: #f2d68e; }
+.recorder-build-copy { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; border: 1px solid #385273; border-radius: 6px; padding: 6px 8px; background: #101f33; color: #b9d2ff; font-size: 10px; }
+.recorder-build-copy:hover { border-color: #4f8cff; background: #17365f; color: #e6edf7; }
 .recorder-reproduction-notes { border-color: #274363; background: linear-gradient(135deg, #0d1b2d, #102642); }
 .recorder-reproduction-notes p { max-height: 150px; margin: 11px 0 0; overflow: auto; white-space: pre-wrap; color: #d4e0f1; font-size: 12px; line-height: 1.6; }
 .recorder-reproduction-notes .recorder-notes-empty { color: #7e94b1; font-style: italic; }
@@ -709,7 +717,7 @@
 .recorder-event-row > button:hover { background: #112540; }
 .recorder-event-row > button.is-active { background: #17365f; box-shadow: inset 3px 0 0 #69a0ff; }
 .recorder-event-time { color: #8fa6c3; }
-.recorder-event-type { color: #8db8ff; }
+.recorder-event-type { flex-basis: 82px; color: #8db8ff; }
 .recorder-event-label { color: #d8e4f5; }
 .recorder-event-row[data-action="click"] .recorder-event-type { color: #f9c75f; }
 .recorder-event-row[data-action="navigation"] .recorder-event-type { color: #bd9cff; }

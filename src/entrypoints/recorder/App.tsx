@@ -5,6 +5,7 @@ import { IncludeOptions, type IncludeRow, NetworkPrivacyReview } from "@/compone
 import { Logo } from "@/components/logo";
 import { ReplayPlayer } from "@/components/replay-player";
 import "./recorder.css";
+import { Accordion, AccordionItem } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,6 +58,19 @@ import { useEffect, useRef, useState } from "react";
 type AppState = "loading" | "annotating" | "form" | "submitting" | "success";
 
 const AUTO_CLOSE_SECONDS = 3;
+
+const BUILD_INFO_IDE_INSTRUCTIONS = `Add a standard application build metadata marker to the shared application layout so QA recordings can identify the build under test.
+
+Render this exact element once on every application page (it may remain hidden):
+
+<div id="app-build" hidden
+  data-app-version="{{VERSION}}"
+  data-app-branch="{{BRANCH}}"
+  data-app-commit="{{COMMIT_SHA}}"
+  data-app-built-at="{{ISO_8601_BUILD_TIMESTAMP}}"
+  data-app-environment="{{ENVIRONMENT}}"></div>
+
+Populate the values from the build or deployment pipeline. Keep the id and data attribute names exactly as written. Do not place secrets, API keys, or user-specific values in this element.`;
 
 // Close this recorder tab. Opened via chrome.tabs.create (not window.open), so
 // window.close() won't work — remove the tab by its own id instead.
@@ -113,6 +127,15 @@ function applyAiContextPrompt(template: string, evidence: string): string {
   return prompt.includes("{{CONTEXT}}")
     ? prompt.replaceAll("{{CONTEXT}}", evidence)
     : `${prompt}\n\n${evidence}`;
+}
+
+function formatPlaybackDuration(durationMs: number): string {
+  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes > 0
+    ? `${minutes}:${String(seconds).padStart(2, "0")}`
+    : `0:${String(seconds).padStart(2, "0")}`;
 }
 
 export default function App() {
@@ -174,6 +197,7 @@ export default function App() {
     interactions: true,
   });
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle");
+  const [buildInstructionsCopied, setBuildInstructionsCopied] = useState(false);
   const [aiContextPrompt, setAiContextPrompt] = useState(DEFAULT_AI_CONTEXT_PROMPT);
   const [interactionQuery, setInteractionQuery] = useState("");
   const [interactionFilter, setInteractionFilter] = useState<"all" | "click" | "navigation">("all");
@@ -589,6 +613,16 @@ export default function App() {
     }
   }
 
+  async function copyBuildInfoInstructions(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(BUILD_INFO_IDE_INSTRUCTIONS);
+      setBuildInstructionsCopied(true);
+      setTimeout(() => setBuildInstructionsCopied(false), 2000);
+    } catch {
+      setBuildInstructionsCopied(false);
+    }
+  }
+
   function handleReset() {
     setScreenshots((prev) => prev.map((s) => ({ ...s, annotatedBlob: null })));
     setExportFilename(null);
@@ -802,6 +836,7 @@ export default function App() {
     new Date()
   );
   const capturedBuild = session?.appBuild;
+  const buildInfoSearchEnabled = session?.captureConfig.searchDomForBuildInfo ?? false;
   const buildContext = capturedBuild
     ? [
         "## Application build",
@@ -812,12 +847,18 @@ export default function App() {
         "Built at: " + (capturedBuild.builtAt ?? "not provided"),
         "Environment: " + (capturedBuild.environment ?? "not provided"),
       ].join("\n")
-    : [
+    : buildInfoSearchEnabled
+      ? [
         "## Application build",
         "",
         "Build information is not available in the captured page.",
         "Ask the AI to add the standard #app-build element with version, branch, commit, build timestamp, and environment to the application's shared layout.",
-      ].join("\n");
+      ].join("\n")
+      : [
+          "## Application build",
+          "",
+          "Build information lookup was disabled for this recording.",
+        ].join("\n");
   const aiCopyContext = applyAiContextPrompt(aiContextPrompt, aiContext + "\n\n" + buildContext);
   const navigationItems = (debuggerEvents.interactions as DebuggerActionEvent[])
     .map((ev, index) => {
@@ -842,6 +883,20 @@ export default function App() {
       (event) => event.actionType === "navigation"
     ).length,
   };
+  const sessionDuration = session
+    ? formatPlaybackDuration((session.stoppedAt ?? Date.now()) - session.startedAt)
+    : "0:00";
+  const screenshotIndexByClickNumber = new Map<number, number>();
+  for (const frame of session?.autoScreenshotClickFrames ?? []) {
+    const screenshotIndex = session?.screenshotFilenames.indexOf(frame.filename) ?? -1;
+    if (screenshotIndex >= 0) screenshotIndexByClickNumber.set(frame.clickNumber, screenshotIndex);
+  }
+  // Compatibility with recordings created before exact filename links existed.
+  if (screenshotIndexByClickNumber.size === 0) {
+    for (const [screenshotIndex, clickNumber] of (session?.autoScreenshotClickNumbers ?? []).entries()) {
+      screenshotIndexByClickNumber.set(clickNumber, screenshotIndex);
+    }
+  }
 
   return (
     <div className="recorder-shell">
@@ -901,14 +956,20 @@ export default function App() {
                 )}
               </div>
               {videoUrl ? (
-                // biome-ignore lint/a11y/useMediaCaption: recordings have no captured caption track; preserve existing audio playback
-                <video
-                  ref={videoRef}
-                  className="recorder-video"
-                  aria-label="Recorded session with captured audio"
-                  controls
-                  src={videoUrl}
-                />
+                <div className="recorder-video-stage">
+                  <div className="recorder-video-status" aria-label="Video recording details">
+                    <span><i aria-hidden="true" /> Recorded session</span>
+                    <span>{sessionDuration}</span>
+                  </div>
+                  {/* biome-ignore lint/a11y/useMediaCaption: recordings have no captured caption track; preserve existing audio playback */}
+                  <video
+                    ref={videoRef}
+                    className="recorder-video"
+                    aria-label="Recorded session with captured audio"
+                    controls
+                    src={videoUrl}
+                  />
+                </div>
               ) : (
                 <div className="recorder-video-empty">
                   <PlayCircle size={38} strokeWidth={1} />
@@ -977,10 +1038,8 @@ export default function App() {
               )}
             </section>
 
-            <details className="recorder-details">
-              <summary>
-                Recording details <span>Title, description & notes</span>
-              </summary>
+            <Accordion className="recorder-details">
+              <AccordionItem title="Recording details" description="Title, description & notes">
               <div className="recorder-details-body">
                 <Label htmlFor="title">Title</Label>
                 <Input
@@ -1015,11 +1074,10 @@ export default function App() {
                   onChange={(e) => setFormValues((v) => ({ ...v, notes: e.target.value }))}
                 />
               </div>
-            </details>
-            <details className="recorder-details">
-              <summary>
-                Capture settings & privacy <span>Review technical details</span>
-              </summary>
+              </AccordionItem>
+            </Accordion>
+            <Accordion className="recorder-details">
+              <AccordionItem title="Capture settings & privacy" description="Review technical details">
               <div className="recorder-details-body">
                 <DiagnosticsPanel
                   captureConfig={session?.captureConfig ?? null}
@@ -1039,7 +1097,8 @@ export default function App() {
                   </div>
                 )}
               </div>
-            </details>
+              </AccordionItem>
+            </Accordion>
           </div>
 
           <aside className="recorder-sidebar" aria-label="Interactions and export">
@@ -1065,9 +1124,18 @@ export default function App() {
                   {capturedBuild.builtAt && <span>{new Date(capturedBuild.builtAt).toLocaleString()}</span>}
                 </div>
               ) : (
-                <p className="recorder-build-unavailable">
-                  Build info unavailable. The AI context will request the shared <code>#app-build</code> layout marker.
-                </p>
+                <div className="recorder-build-missing">
+                  <p className="recorder-build-unavailable">
+                    {buildInfoSearchEnabled
+                      ? <>Build info was not found. Add the shared <code>#app-build</code> layout marker.</>
+                      : <>Build info lookup was disabled for this recording.</>}
+                  </p>
+                  {buildInfoSearchEnabled && (
+                    <button type="button" className="recorder-build-copy" onClick={copyBuildInfoInstructions}>
+                      <Copy size={13} /> {buildInstructionsCopied ? "Instructions copied" : "Copy instructions for IDE"}
+                    </button>
+                  )}
+                </div>
               )}
               <div className="recorder-version"><Tag size={13} /> Extension v{chrome.runtime.getManifest().version}</div>
             </section>
@@ -1128,11 +1196,14 @@ export default function App() {
                   aria-label="Recorded interaction timeline"
                 >
                   {navigationItems.map(({ ev, index, label, seconds }) => {
-                    // Auto-captures are written in interaction order. A screenshot icon is
-                    // shown only when this event has a corresponding saved frame.
-                    const linkedScreenshot = session?.captureConfig.autoScreenshotOnInteraction
-                      ? screenshots[index]
+                    const clickNumber = Number(ev.metadata?.clickNumber);
+                    const screenshotIndex = Number.isFinite(clickNumber)
+                      ? screenshotIndexByClickNumber.get(clickNumber)
                       : undefined;
+                    const linkedScreenshot = screenshotIndex === undefined ? undefined : screenshots[screenshotIndex];
+                    const eventTypeLabel = ev.actionType === "click" && Number.isFinite(clickNumber)
+                      ? `Click #${clickNumber}`
+                      : ev.actionType;
                     return (
                       <li className="recorder-event-row" data-action={ev.actionType} key={`${ev.timestamp}-${index}`}>
                         <button
@@ -1151,13 +1222,13 @@ export default function App() {
                               .toString()
                               .padStart(2, "0")}`}
                           </time>
-                          <span className="recorder-event-type">{ev.actionType}</span>
+                          <span className="recorder-event-type">{eventTypeLabel}</span>
                           <span className="recorder-event-label" title={label}>{label}</span>
                           {linkedScreenshot && (
                             <span className="recorder-event-screenshot">
                               <Camera size={14} aria-label="Screenshot captured for this interaction" />
                               <span className="recorder-event-screenshot-popover" role="tooltip">
-                                <img src={linkedScreenshot.dataUrl} alt={`Screenshot for interaction ${index + 1}`} />
+                                <img src={linkedScreenshot.dataUrl} alt={`Screenshot for click ${clickNumber}`} />
                               </span>
                             </span>
                           )}

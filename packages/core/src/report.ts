@@ -136,12 +136,16 @@ export function buildReportMd(input: ReportInput, now: Date): string {
   if (interactions.length > 0) {
     parts.push(`## Interactions (${interactions.length} events)`);
     parts.push("");
-    parts.push("| Time | Type | Target |");
-    parts.push("|------|------|--------|");
+    parts.push("| Time | Type | Target | Documentation evidence |");
+    parts.push("|------|------|--------|------------------------|");
     for (const ev of interactions) {
       const time = startedAt !== null ? formatOffset(ev.timestamp - startedAt) : "—";
       const target = ev.target ? escapeCell(ev.target.slice(0, 80)) : "—";
-      parts.push(`| ${time} | ${ev.actionType} | ${target} |`);
+      const clickNumber = Number(ev.metadata?.clickNumber);
+      const evidence = ev.actionType === "click" && Number.isFinite(clickNumber)
+        ? `Click #${clickNumber}; target highlighted in its automatic screenshot`
+        : "—";
+      parts.push(`| ${time} | ${ev.actionType} | ${target} | ${evidence} |`);
     }
     parts.push("");
   }

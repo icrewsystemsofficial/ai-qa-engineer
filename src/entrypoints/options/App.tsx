@@ -1,5 +1,6 @@
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
+import { Tabs, Tab } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -86,6 +87,12 @@ export default function App() {
   );
   const [persistBusy, setPersistBusy] = useState(false);
   const [persistError, setPersistError] = useState<string | null>(null);
+  const [settingsTab, setSettingsTab] = useState("capture");
+
+  const selectSettingsTab = (tab: string) => {
+    setSettingsTab(tab);
+    document.getElementById(`settings-${tab}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   // Formats supported by MediaRecorder in this browser context
   const supportedFormats = useMemo<VideoFormat[]>(() => {
@@ -274,7 +281,17 @@ export default function App() {
           AI QA Engineer — Settings
         </h1>
 
-        <section className="mb-6">
+        <div className="sticky top-0 z-10 -mx-6 mb-6 border-y border-border bg-background/95 px-6 py-3 backdrop-blur">
+          <Tabs className="w-full">
+            <Tab active={settingsTab === "capture"} onClick={() => selectSettingsTab("capture")}>Capture</Tab>
+            <Tab active={settingsTab === "video"} onClick={() => selectSettingsTab("video")}>Video</Tab>
+            <Tab active={settingsTab === "handoff"} onClick={() => selectSettingsTab("handoff")}>AI handoff</Tab>
+            <Tab active={settingsTab === "advanced"} onClick={() => selectSettingsTab("advanced")}>Advanced</Tab>
+            <Tab active={settingsTab === "storage"} onClick={() => selectSettingsTab("storage")}>Storage</Tab>
+          </Tabs>
+        </div>
+
+        <section id="settings-capture" className="mb-6 scroll-mt-20 rounded-xl border border-border bg-card p-5 shadow-sm">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
             Capture defaults
           </h2>
@@ -304,6 +321,25 @@ export default function App() {
                 <option value="picker">Choose a screen, window, or tab</option>
                 <option value="desktop">Entire desktop</option>
               </select>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="opt-build-info" className="font-medium">
+                    Search DOM for build info
+                  </Label>
+                  <InfoTooltip text="Once, immediately before recording begins, looks for the standard hidden #app-build element. If found, version, branch, commit, timestamp, and environment are added to the recording context. It does not monitor the page after that." />
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  One-time lookup for <code>#app-build</code> before recording.
+                </p>
+              </div>
+              <Switch
+                id="opt-build-info"
+                checked={captureConfig.searchDomForBuildInfo}
+                onChange={() => toggleCapture("searchDomForBuildInfo")}
+              />
             </div>
 
             <div className="flex items-center justify-between">
@@ -406,10 +442,10 @@ export default function App() {
                   <Label htmlFor="opt-auto-screenshot" className="font-medium">
                     Auto-screenshot on interaction
                   </Label>
-                  <InfoTooltip text="Takes a screenshot 1.5 s after each click, input change, or navigation, debounced so rapid actions produce one screenshot. Can generate many screenshots on busy workflows — check the count in the recorder before exporting." />
+                  <InfoTooltip text="Takes an immediate screenshot at each click, with the clicked element and click number highlighted. Rapid clicks are captured in order. Can generate many screenshots on busy workflows — check the count in the recorder before exporting." />
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Take a screenshot 1.5 s after each click, change, or navigation. Debounced.
+                  Capture the click moment, with a numbered target highlight.
                 </p>
               </div>
               <Switch
@@ -440,7 +476,7 @@ export default function App() {
           </div>
         </section>
 
-        <section className="mb-6">
+        <section className="mb-6 rounded-xl border border-border bg-card p-5 shadow-sm">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
             Network filter
           </h2>
@@ -506,7 +542,7 @@ export default function App() {
           </div>
         </section>
 
-        <section className="mb-6">
+        <section className="mb-6 rounded-xl border border-border bg-card p-5 shadow-sm">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
             Header protection
           </h2>
@@ -535,7 +571,7 @@ export default function App() {
             </div>
           </div>
         </section>
-        <section className="mb-6">
+        <section className="mb-6 rounded-xl border border-border bg-card p-5 shadow-sm">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
             Export
           </h2>
@@ -582,7 +618,7 @@ export default function App() {
           </div>
         </section>
 
-        <section className="mb-6">
+        <section id="settings-video" className="mb-6 scroll-mt-20 rounded-xl border border-border bg-card p-5 shadow-sm">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
             Video recording
           </h2>
@@ -712,7 +748,7 @@ export default function App() {
           </div>
         </section>
 
-        <section className="mb-6">
+        <section id="settings-handoff" className="mb-6 scroll-mt-20 rounded-xl border border-border bg-card p-5 shadow-sm">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
             AI context handoff
           </h2>
@@ -753,7 +789,7 @@ export default function App() {
           </div>
         </section>
 
-        <section className="mb-8">
+        <section className="mb-8 rounded-xl border border-border bg-card p-5 shadow-sm">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
             Ring recording
           </h2>
@@ -905,7 +941,7 @@ export default function App() {
           </div>
         </section>
 
-        <section className="mb-8">
+        <section id="settings-advanced" className="mb-8 scroll-mt-20 rounded-xl border border-border bg-card p-5 shadow-sm">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
             Experimental
           </h2>
@@ -971,7 +1007,7 @@ export default function App() {
           </div>
         </section>
 
-        <section className="mb-8">
+        <section id="settings-storage" className="mb-8 scroll-mt-20 rounded-xl border border-border bg-card p-5 shadow-sm">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
             Storage
           </h2>
@@ -1004,7 +1040,7 @@ export default function App() {
           </div>
         </section>
 
-        <section className="mb-8">
+        <section className="mb-8 rounded-xl border border-border bg-card p-5 shadow-sm">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
             Report a bug
           </h2>

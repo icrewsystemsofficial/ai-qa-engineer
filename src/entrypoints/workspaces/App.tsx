@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Logo } from "@/components/logo";
 import { sendToBackground } from "@/lib/messaging";
 import type { RecordingWorkspace } from "@/lib/types";
@@ -99,15 +100,15 @@ export default function App() {
         {loading ? (
           <p className="py-12 text-center text-sm text-muted-foreground">Loading recordings…</p>
         ) : workspaces.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border p-12 text-center">
+          <Card className="border-dashed py-7 text-center">
             <Archive className="mx-auto h-8 w-8 text-muted-foreground" />
             <p className="mt-3 font-medium">No saved recordings yet</p>
             <p className="mt-1 text-sm text-muted-foreground">Finish a recording to create its first domain workspace.</p>
-          </div>
+          </Card>
         ) : (
           <div className="flex flex-col gap-4">
             {workspaces.map((workspace) => (
-              <section key={workspace.domain} className="overflow-hidden rounded-xl border border-border bg-card">
+              <Card key={workspace.domain} className="overflow-hidden">
                 <div className="flex items-center justify-between border-b border-border px-4 py-3">
                   <div>
                     <h2 className="font-medium">{workspace.domain}</h2>
@@ -169,7 +170,7 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-              </section>
+              </Card>
             ))}
           </div>
         )}

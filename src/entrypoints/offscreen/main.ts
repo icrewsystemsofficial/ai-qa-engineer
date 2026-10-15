@@ -19,9 +19,14 @@ function resolveMimeType(format: VideoConfig["format"]): string {
   return candidates.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
 }
 
-function buildStreamConstraints(streamId: string, config: VideoConfig): MediaStreamConstraints {
+function buildStreamConstraints(
+  streamId: string,
+  config: VideoConfig,
+  source: "tab" | "desktop",
+  canRequestAudio: boolean
+): MediaStreamConstraints {
   const mandatory: Record<string, unknown> = {
-    chromeMediaSource: "tab",
+    chromeMediaSource: source,
     chromeMediaSourceId: streamId,
     maxFrameRate: config.frameRate,
   };
@@ -34,9 +39,10 @@ function buildStreamConstraints(streamId: string, config: VideoConfig): MediaStr
   }
   // "native" — no width/height cap; only frameRate is constrained
   return {
-    // Capture tab audio; it is mixed with optional microphone narration below.
+    // Desktop audio is only requested when the user retained Chrome's Share
+    // audio choice. Asking for it after opt-out makes getUserMedia fail.
     // @ts-expect-error chromeMediaSource/mandatory not in standard DOM types
-    audio: { mandatory },
+    audio: canRequestAudio ? { mandatory } : false,
     // @ts-expect-error chromeMediaSource/mandatory not in standard DOM types
     video: { mandatory },
   };
@@ -63,11 +69,19 @@ chrome.runtime.onMessage.addListener(
     streamId?: string;
     filename?: string;
     videoConfig?: VideoConfig;
+    source?: "tab" | "desktop";
+    canRequestAudio?: boolean;
   }) => {
     if (message.type === "offscreen-start-recording" && message.streamId && message.filename) {
       const cfg = message.videoConfig;
       if (!cfg) return false;
-      startRecording(message.streamId, message.filename, cfg).catch((err: unknown) => {
+      startRecording(
+        message.streamId,
+        message.filename,
+        cfg,
+        message.source ?? "tab",
+        message.canRequestAudio ?? true
+      ).catch((err: unknown) => {
         chrome.runtime.sendMessage({ type: "offscreen-error", message: String(err) });
       });
     } else if (message.type === "offscreen-stop-recording") {
@@ -92,10 +106,12 @@ chrome.runtime.onMessage.addListener(
 async function startRecording(
   streamId: string,
   filename: string,
-  videoConfig: VideoConfig
+  videoConfig: VideoConfig,
+  source: "tab" | "desktop",
+  canRequestAudio: boolean
 ): Promise<void> {
   const stream = await navigator.mediaDevices.getUserMedia(
-    buildStreamConstraints(streamId, videoConfig)
+    buildStreamConstraints(streamId, videoConfig, source, canRequestAudio)
   );
 
   const mixed = new MediaStream(stream.getVideoTracks());
@@ -192,7 +208,7 @@ function stopRecording(): void {
 
 async function startRingRecording(streamId: string, videoConfig: VideoConfig): Promise<void> {
   const stream = await navigator.mediaDevices.getUserMedia(
-    buildStreamConstraints(streamId, videoConfig)
+    buildStreamConstraints(streamId, videoConfig, "tab", true)
   );
 
   const mimeType = resolveMimeType(videoConfig.format);
